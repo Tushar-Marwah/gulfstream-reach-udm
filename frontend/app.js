@@ -130,6 +130,7 @@ async function initContext() {
   const c = await api("/api/context");
   CTX = c;
   const fill = (sel, items, val) => {
+    if (!sel) return;
     sel.innerHTML = items.map(x => `<option ${x === val ? "selected" : ""}>${esc(x)}</option>`).join("");
   };
   fill($("#ctx-actor"), c.roles, c.actor);
@@ -899,8 +900,9 @@ if ($("#narr-q")) $("#narr-q").addEventListener("keydown", e => { if (e.key === 
 if ($("#ent-btn")) $("#ent-btn").addEventListener("click", () => entitySearch($("#ent-q").value.trim()));
 if ($("#ent-q")) $("#ent-q").addEventListener("keydown", e => { if (e.key === "Enter") entitySearch($("#ent-q").value.trim()); });
 
-// ---- reset ---------------------------------------------------------------
-$("#reset-btn").addEventListener("click", async () => {
+// ---- reset (button removed from the header; handler guarded) --------------
+const _resetBtn = $("#reset-btn");
+if (_resetBtn) _resetBtn.addEventListener("click", async () => {
   await api("/api/reset", {});
   currentPlan = null;
   $("#ingest-plan").innerHTML = "";
