@@ -1,23 +1,24 @@
 :root {
-  --bg: #0a0e16;
-  --card: #121823;
-  --panel-2: #0e141d;
-  --sidebar: #0c111a;
-  --border: #20293a;
-  --border-soft: #18202e;
-  --text: #e6edf6;
-  --muted: #8896a8;
-  --navy: #3b82f6;          /* primary (Foundry blue) */
-  --navy-deep: #2563eb;
-  --teal: #2dd4bf;
-  --teal-dim: #29b3a4;
-  --blue: #60a5fa;
+  /* ---- Gulfstream aviation-premium theme: deep navy, Gulfstream blue, champagne gold ---- */
+  --bg: #08131f;            /* deep aviation navy */
+  --card: #0f2338;
+  --panel-2: #0c1c2e;
+  --sidebar: #061019;
+  --border: #1d3a57;
+  --border-soft: #16283c;
+  --text: #eaf2fa;
+  --muted: #94aabf;
+  --navy: #2f80c4;          /* Gulfstream blue (primary) */
+  --navy-deep: #22679f;
+  --teal: #c8a96f;          /* champagne gold (accent) */
+  --teal-dim: #b0925a;
+  --blue: #5ea3dd;
   --purple: #a78bfa;
-  --orange: #f59e0b;
-  --green: #34d399;
-  --red: #f87171;
-  --amber: #fbbf24;
-  --shadow: 0 1px 2px rgba(0,0,0,.4);
+  --orange: #e0a458;
+  --green: #5cc7a4;
+  --red: #e88a7d;
+  --amber: #d8b46a;
+  --shadow: 0 1px 3px rgba(0,0,0,.5);
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 }
 * { box-sizing: border-box; }
