@@ -120,6 +120,10 @@ const loaders = {
   raw: loadRaw, ontology: loadOntology, governance: loadGovernance,
   documents: loadDocuments, companies: loadCompanies, projects: loadProjects,
   console: loadConsole, ingest: loadIncoming, agent: loadAgentMeta,
+  sources: loadSources,
+  "tpl-dashboard": loadTplDashboard, "tpl-templates": loadTemplates,
+  "tpl-category": loadTplCategory, "tpl-query": loadTplQuery,
+  "agent-substitution": loadSubAgent, "agent-audit": loadAuditAgent,
 };
 
 // ---- control plane: context (role / branch / workspace) -----------------
@@ -374,8 +378,16 @@ $$(".tab").forEach(tab => tab.addEventListener("click", () => {
   $$(".panel").forEach(p => p.classList.remove("active"));
   tab.classList.add("active");
   const id = tab.dataset.tab;
-  $("#" + id).classList.add("active");
+  const panel = $("#" + id);
+  if (panel) panel.classList.add("active");
   if (loaders[id]) loaders[id]();   // refresh each time so cross-tab changes show
+}));
+
+// collapsible sidebar modules
+$$(".mod").forEach(m => m.addEventListener("click", () => {
+  const sub = document.getElementById("mod-" + m.dataset.mod);
+  const open = m.classList.toggle("open");
+  if (sub) sub.classList.toggle("open", open);
 }));
 
 // ---- RAW -----------------------------------------------------------------
@@ -854,8 +866,9 @@ async function ask() {
   renderAgent(r);
 }
 
-function renderAgent(r) {
-  const host = $("#agent-result");
+function renderAgent(r) { renderAgentInto($("#agent-result"), r); }
+
+function renderAgentInto(host, r) {
   host.innerHTML = "";
   const modeBadge = r.mode === "llm" ? '<span class="badge badge-new">Claude</span>'
     : '<span class="badge badge-soft">router</span>';
@@ -891,6 +904,230 @@ function renderAgent(r) {
   if (r.cost_usd)
     ans.appendChild(el("div", "sources", `<b>LLM cost:</b> $${Number(r.cost_usd).toFixed(5)} (${esc(r.engine || "")})`));
   host.appendChild(ans);
+}
+
+// ---- reusable embedded agent (for Substitution / Audit agent tabs) -------
+function mountAgent(hostSel, opts) {
+  const host = $(hostSel);
+  if (!host || host._wired) { if (host && host._wired) return; }
+  host._wired = true;
+  host.innerHTML = `
+    <div class="question-chips" data-role="chips"></div>
+    <div class="ask-row">
+      <input type="text" data-role="q" placeholder="${esc(opts.placeholder || "Ask a question…")}">
+      <button class="btn btn-primary" data-role="go">Ask</button>
+    </div>
+    <div data-role="result"></div>`;
+  const qi = host.querySelector('[data-role=q]');
+  const res = host.querySelector('[data-role=result]');
+  const chips = host.querySelector('[data-role=chips]');
+  (opts.suggested || []).forEach(q => {
+    const c = el("button", "q-chip", esc(q));
+    c.addEventListener("click", () => { qi.value = q; go(); });
+    chips.appendChild(c);
+  });
+  async function go() {
+    const q = qi.value.trim(); if (!q) return;
+    res.innerHTML = '<div class="spinner">Thinking…</div>';
+    const framed = opts.framing ? opts.framing + " " + q : q;
+    renderAgentInto(res, await api("/api/agent", { question: framed, use_llm: true }));
+  }
+  host.querySelector('[data-role=go]').addEventListener("click", go);
+  qi.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+}
+
+function loadSubAgent() {
+  mountAgent("#sub-agent", {
+    placeholder: "e.g. What can replace strontium chromate in the G700 wing primer?",
+    framing: "Focus on substitution / drop-in alternatives and their qualification status.",
+    suggested: [
+      "What are the chrome-free alternatives to strontium chromate primers, and are they qualified?",
+      "Which cadmium-plated parts have a viable substitution, and on which programs?",
+      "Where is hexavalent chromium still in use, and what is the migration path?",
+    ],
+  });
+}
+
+function loadAuditAgent() {
+  mountAgent("#audit-agent", {
+    placeholder: "e.g. Which SDS records are overdue for revision?",
+    framing: "Focus on SDS currency, supplier REACH registration, exposure scenarios and audit readiness.",
+    suggested: [
+      "Which suppliers are not confirmed REACH-registered, and what do they supply?",
+      "What are the exposure limits and hazard statements for the substances we still use?",
+      "Which chemicals are on Annex XIV, and what are their sunset dates?",
+    ],
+  });
+}
+
+// ---- DATA SOURCE IDENTIFICATION -----------------------------------------
+async function loadSources() {
+  const host = $("#sources-list"); host.innerHTML = '<div class="spinner">Loading…</div>';
+  const data = await api("/api/sources");
+  host.innerHTML = "";
+  host.appendChild(el("div", "muted",
+    `${data.sources.length} connected source table(s) feeding the model.`));
+  const card = el("div", "card"); card.style.marginTop = "10px";
+  const rows = data.sources.map(s => ({
+    "source table": s.source_table,
+    "from file": s.source_file,
+    "feeds objects": s.objects.join(", ") || "—",
+    "properties": s.properties,
+    "approved": s.approved,
+  }));
+  card.appendChild(dataTable(
+    ["source table", "from file", "feeds objects", "properties", "approved"], rows, 300));
+  host.appendChild(card);
+}
+
+// ---- DATA TEMPLATES ------------------------------------------------------
+let tplMode = "template", tplLast = null;
+
+function loadTemplates() {
+  const modeTpl = $("#tpl-mode-tpl"), modeQ = $("#tpl-mode-q");
+  if (modeTpl && !modeTpl._wired) {
+    modeTpl._wired = true;
+    const setMode = (m) => {
+      tplMode = m;
+      modeTpl.classList.toggle("chip-on", m === "template");
+      modeQ.classList.toggle("chip-on", m === "query");
+      $("#tpl-upload-block").classList.toggle("hidden", m !== "template");
+      $("#tpl-query-block").classList.toggle("hidden", m !== "query");
+    };
+    modeTpl.addEventListener("click", () => setMode("template"));
+    modeQ.addEventListener("click", () => setMode("query"));
+    $("#tpl-file").addEventListener("change", async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      const text = await f.text();
+      const firstLine = (text.split(/\r?\n/)[0] || "");
+      const sep = firstLine.includes("\t") ? "\t" : ",";
+      $("#tpl-headers").value = firstLine.split(sep).map(s => s.trim().replace(/^"|"$/g, "")).filter(Boolean).join(", ");
+    });
+    $("#tpl-generate").addEventListener("click", generateTemplate);
+    $("#tpl-download").addEventListener("click", () => {
+      if (tplLast) downloadCsv(tplLast.columns, tplLast.rows, (tplLast.name || "output") + ".csv");
+    });
+  }
+}
+
+async function generateTemplate() {
+  const status = $("#tpl-status"), result = $("#tpl-result");
+  const name = $("#tpl-name").value.trim();
+  const body = { mode: tplMode, name };
+  if (tplMode === "template") {
+    body.headers = $("#tpl-headers").value.split(",").map(s => s.trim()).filter(Boolean);
+    if (!body.headers.length) { status.textContent = "Add some column headers first."; return; }
+  } else {
+    body.query = $("#tpl-q-input").value.trim();
+    if (!body.query) { status.textContent = "Type a query first."; return; }
+  }
+  status.textContent = "";
+  $("#tpl-download").classList.add("hidden");
+  result.innerHTML = '<div class="spinner">Generating from the model… the agent is retrieving & formatting your data.</div>';
+  const r = await api("/api/template/generate", body);
+  if (!r.ok) { result.innerHTML = `<div class="empty">${esc(r.error || "Generation failed.")}</div>`; return; }
+  tplLast = r;
+  renderTplResult(r);
+  $("#tpl-download").classList.remove("hidden");
+}
+
+function renderTplResult(r) {
+  const result = $("#tpl-result");
+  result.innerHTML = "";
+  const rows = r.rows.map(row => {
+    const o = {}; r.columns.forEach((c, i) => o[c] = row[i]); return o;
+  });
+  result.appendChild(el("div", "interp",
+    `<span class="badge badge-new">generated</span> <b>${esc(r.name || "output")}</b> — ${r.rows.length} row(s), ${r.columns.length} column(s).
+     ${r.note ? "<br><span class='muted'>" + esc(r.note) + "</span>" : ""}
+     ${r.cost_usd ? "<br><span class='muted'>engine: " + esc(r.engine) + " · $" + Number(r.cost_usd).toFixed(5) + "</span>" : ""}`));
+  const card = el("div", "card"); card.style.marginTop = "10px";
+  card.appendChild(el("div", "card-head",
+    `<span class="name">${esc(r.mode === "template" ? "populated template" : "query result")}</span><span class="meta">${esc(r.spec)}</span>`));
+  card.appendChild(dataTable(r.columns, rows, 500));
+  result.appendChild(card);
+}
+
+function downloadCsv(columns, rows, filename) {
+  const q = (v) => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const lines = [columns.map(q).join(",")];
+  rows.forEach(r => lines.push((Array.isArray(r) ? r : columns.map(c => r[c])).map(q).join(",")));
+  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function loadTplCategory() {
+  const host = $("#tpl-cat"); host.innerHTML = '<div class="spinner">Loading…</div>';
+  const data = await api("/api/template/categories");
+  host.innerHTML = "";
+  if (!data.llm_available) host.appendChild(el("div", "interp",
+    `<span class="badge badge-review">engine offline</span> template generation needs the LLM configured on this deployment.`));
+  const grid = el("div", "obj-grid"); grid.style.marginTop = "12px";
+  data.categories.forEach(c => {
+    const card = el("div", "obj-card");
+    card.appendChild(el("h4", null, `${esc(c.object)} <span class="badge badge-soft">${c.properties.length}</span>`));
+    c.properties.forEach(p => card.appendChild(el("div", "prop",
+      `<span class="pname">${esc(p.property)}</span><span class="ptype">${esc(p.type)}${p.unit ? " · " + esc(p.unit) : ""}</span>`)));
+    grid.appendChild(card);
+  });
+  host.appendChild(grid);
+}
+
+async function loadTplQuery() {
+  const host = $("#tpl-track"); host.innerHTML = '<div class="spinner">Loading…</div>';
+  const data = await api("/api/template/history");
+  host.innerHTML = "";
+  if (!data.runs.length) { host.appendChild(el("div", "empty", "No templates generated yet — build one under the Templates tab.")); return; }
+  host.appendChild(el("div", "muted", `${data.runs.length} generation(s) — most recent first. Click to view or re-download.`));
+  const card = el("div", "card"); card.style.marginTop = "10px";
+  data.runs.forEach(run => {
+    const row = el("div", "tail-row"); row.style.cursor = "pointer";
+    row.innerHTML = `<span class="badge ${run.mode === "template" ? "badge-auto" : "badge-new"}">${esc(run.mode)}</span>
+      <span class="col">${esc(run.name)}</span>
+      <span class="muted">${esc(run.spec)}</span>
+      <span class="muted" style="margin-left:auto">${run.rowcount} rows · ${esc(run.created_at)}</span>`;
+    row.addEventListener("click", () => {
+      const rows = run.rows.map(r => { const o = {}; run.columns.forEach((c, i) => o[c] = r[i]); return o; });
+      const node = el("div");
+      node.appendChild(el("div", "interp", `<b>${esc(run.name)}</b> — ${esc(run.spec)}<br><span class="muted">${esc(run.note || "")}</span>`));
+      const dl = el("button", "btn btn-primary", "⬇ Download CSV"); dl.style.marginBottom = "10px";
+      dl.addEventListener("click", () => downloadCsv(run.columns, run.rows, (run.name || "output") + ".csv"));
+      node.appendChild(dl);
+      node.appendChild(dataTable(run.columns, rows, 500));
+      openDrawer("Generated · " + esc(run.name), node);
+    });
+    card.appendChild(row);
+  });
+  host.appendChild(card);
+}
+
+async function loadTplDashboard() {
+  const host = $("#tpl-dash"); host.innerHTML = '<div class="spinner">Loading…</div>';
+  const [cats, hist] = await Promise.all([api("/api/template/categories"), api("/api/template/history")]);
+  host.innerHTML = "";
+  const stat = el("div", "stat-row");
+  [["sc-purple", "◆", "Object categories", cats.categories.length],
+   ["sc-orange", "≡", "Fields available", cats.categories.reduce((a, c) => a + c.properties.length, 0)],
+   ["sc-blue", "⚙", "Outputs generated", hist.runs.length],
+   ["sc-teal", "▦", "Rows produced", hist.runs.reduce((a, r) => a + (r.rowcount || 0), 0)]
+  ].forEach(([cls, ic, lbl, num]) => {
+    const c = el("div", "stat-card " + cls);
+    c.innerHTML = `<div class="icon">${ic}</div><div><div class="lbl">${lbl}</div><div class="num">${num}</div></div>`;
+    stat.appendChild(c);
+  });
+  host.appendChild(stat);
+  host.appendChild(el("div", "interp", `<b>Build a custom structured output →</b> open <b>Templates</b> to upload a header template or run an agentic retrieval query. Every run is tracked under <b>Query tracking</b>.`));
+  if (hist.runs.length) {
+    const card = el("div", "card"); card.style.marginTop = "10px";
+    card.appendChild(el("div", "card-head", `<span class="name">recent outputs</span><span class="meta">${hist.runs.length}</span>`));
+    hist.runs.slice(0, 6).forEach(run => card.appendChild(el("div", "tail-row",
+      `<span class="badge ${run.mode === "template" ? "badge-auto" : "badge-new"}">${esc(run.mode)}</span>
+       <span class="col">${esc(run.name)}</span><span class="muted">${esc(run.spec)}</span>
+       <span class="muted" style="margin-left:auto">${run.rowcount} rows</span>`)));
+    host.appendChild(card);
+  }
 }
 
 $("#ask-btn").addEventListener("click", ask);

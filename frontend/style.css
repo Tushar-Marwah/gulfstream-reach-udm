@@ -66,6 +66,17 @@ body { background: var(--bg); color: var(--text); font-size: 14px; line-height: 
   margin-bottom: 2px; transition: all .12s; }
 .tab:hover { color: var(--text); background: #141b27; }
 .tab.active { color: #fff; background: #16233b; box-shadow: inset 2px 0 0 var(--navy); }
+/* collapsible modules */
+.mod { display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left;
+  background: none; border: none; color: var(--text); font-size: 12.5px; font-weight: 700; letter-spacing: .01em;
+  cursor: pointer; padding: 11px 16px; margin-top: 4px; }
+.mod:hover { background: #0e1b2c; }
+.mod .caret { font-size: 9px; color: var(--muted); transition: transform .2s ease; }
+.mod.open .caret { transform: rotate(180deg); }
+.submod { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
+.submod.open { max-height: 460px; }
+.submod .tab { padding-left: 30px; font-size: 12.5px; }
+.submod .tab.active { box-shadow: inset 3px 0 0 var(--teal); }
 
 /* ---- main / panels ---- */
 main { flex: 1; min-width: 0; padding: 24px 30px 80px; max-width: 1180px; }

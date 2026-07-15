@@ -17,6 +17,7 @@ import docs
 import governance
 import search
 import plat
+import template
 from resolver import resolve
 
 os.makedirs(ingest.UPLOAD_DIR, exist_ok=True)
@@ -425,6 +426,66 @@ def api_agent():
     finally:
         conn.close()
     return jsonify(out)
+
+
+# ---- data source identification -----------------------------------------
+@app.route("/api/sources")
+def api_sources():
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT source_file, source_table, object_property, status "
+        "FROM bindings ORDER BY source_file, source_table").fetchall()
+    conn.close()
+    by = {}
+    for r in rows:
+        sf = "seed data" if r["source_file"] == "seed" else (r["source_file"] or "—")
+        key = (sf, r["source_table"])
+        d = by.setdefault(key, {"source_file": sf, "source_table": r["source_table"],
+                                "objects": set(), "properties": 0, "approved": 0})
+        d["objects"].add((r["object_property"] or ".").split(".")[0])
+        d["properties"] += 1
+        if r["status"] == "approved":
+            d["approved"] += 1
+    out = [{"source_file": v["source_file"], "source_table": v["source_table"],
+            "objects": sorted(o for o in v["objects"] if o),
+            "properties": v["properties"], "approved": v["approved"]}
+           for v in by.values()]
+    return jsonify({"sources": out})
+
+
+# ---- data templates ------------------------------------------------------
+@app.route("/api/template/categories")
+def api_tpl_categories():
+    conn = get_conn()
+    try:
+        cats = template.categories(conn)
+    finally:
+        conn.close()
+    return jsonify({"categories": cats, "llm_available": llm.available()})
+
+
+@app.route("/api/template/generate", methods=["POST"])
+def api_tpl_generate():
+    data = request.get_json(force=True)
+    conn = get_conn()
+    try:
+        out = template.generate(
+            conn, mode=data.get("mode", "query"),
+            headers=data.get("headers"), query=data.get("query", ""),
+            name=data.get("name", ""))
+    finally:
+        conn.close()
+    return jsonify(out)
+
+
+@app.route("/api/template/history")
+def api_tpl_history():
+    conn = get_conn()
+    try:
+        runs = template.history(conn)
+    finally:
+        conn.close()
+    return jsonify({"runs": runs})
 
 
 # ---- reset ---------------------------------------------------------------

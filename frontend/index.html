@@ -26,22 +26,42 @@
 
 <div class="layout">
 <aside class="sidebar">
-  <div class="side-group">Platform</div>
-  <button class="tab active" data-tab="overview">Overview</button>
-  <div class="side-group">Data Connection</div>
-  <button class="tab" data-tab="raw">Raw layer</button>
-  <button class="tab" data-tab="documents">Documents</button>
-  <button class="tab" data-tab="ingest">Pipelines / Ingest</button>
-  <div class="side-group">Ontology</div>
-  <button class="tab" data-tab="ontology">Meaning layer</button>
-  <button class="tab" data-tab="governance">Governance</button>
-  <div class="side-group">Tracking</div>
-  <button class="tab" data-tab="companies">Companies</button>
-  <button class="tab" data-tab="projects">Projects</button>
-  <div class="side-group">Operations</div>
-  <button class="tab" data-tab="console">Console</button>
-  <div class="side-group">AIP</div>
-  <button class="tab" data-tab="agent">Agent</button>
+  <button class="tab active" data-tab="overview">Home</button>
+
+  <button class="mod open" data-mod="dm">Data Management<span class="caret">▾</span></button>
+  <div class="submod open" id="mod-dm">
+    <button class="tab" data-tab="documents">Dashboard</button>
+    <button class="tab" data-tab="ingest">Data Upload</button>
+    <button class="tab" data-tab="raw">Uploaded Files</button>
+  </div>
+
+  <button class="mod" data-mod="onto">Data Ontology<span class="caret">▾</span></button>
+  <div class="submod" id="mod-onto">
+    <button class="tab" data-tab="ontology">Meaning layer</button>
+    <button class="tab" data-tab="sources">Data source identification</button>
+    <button class="tab" data-tab="governance">Data governance setup</button>
+  </div>
+
+  <button class="mod" data-mod="tpl">Data Templates<span class="caret">▾</span></button>
+  <div class="submod" id="mod-tpl">
+    <button class="tab" data-tab="tpl-dashboard">Dashboard</button>
+    <button class="tab" data-tab="tpl-templates">Templates</button>
+    <button class="tab" data-tab="tpl-category">Data Category</button>
+    <button class="tab" data-tab="tpl-query">Query tracking</button>
+  </div>
+
+  <button class="mod" data-mod="agents">Agents<span class="caret">▾</span></button>
+  <div class="submod" id="mod-agents">
+    <button class="tab" data-tab="agent">Compliance Agent</button>
+    <button class="tab" data-tab="agent-substitution">Substitution Agent</button>
+    <button class="tab" data-tab="agent-audit">Audit &amp; Exposure Agent</button>
+  </div>
+
+  <button class="mod" data-mod="track">Tracking<span class="caret">▾</span></button>
+  <div class="submod" id="mod-track">
+    <button class="tab" data-tab="companies">Suppliers</button>
+    <button class="tab" data-tab="projects">Programs</button>
+  </div>
 </aside>
 
 <main>
@@ -515,7 +535,7 @@
 
   <!-- RAW -->
   <section id="raw" class="panel">
-    <h2>Raw layer — the files, stored as-is</h2>
+    <h2>Uploaded Files — the source data, stored as-is</h2>
     <p class="muted">Different sources, different shapes, messy values. We change nothing about them.
       Staging tables (<code>stg_…</code>) appear here after you ingest a file on tab 4.</p>
     <div id="raw-tables" class="stack"></div>
@@ -537,7 +557,7 @@
 
   <!-- GOVERNANCE -->
   <section id="governance" class="panel">
-    <h2>Governance — health, lineage & readiness</h2>
+    <h2>Data governance setup — health, lineage &amp; readiness</h2>
     <p class="muted">The Foundry-defining layer: don't just store the data — <b>govern</b> it. Score how complete
       the model is against the PEL spec, run health checks over every value, and trace any number back through
       its conversion and transform to the exact raw cell and source document it came from.</p>
@@ -559,7 +579,7 @@
 
   <!-- DOCUMENTS -->
   <section id="documents" class="panel">
-    <h2>Document repository — everything ingested since inception</h2>
+    <h2>Dashboard — everything ingested</h2>
     <p class="muted">A permanent record of every source the platform has ever ingested — seed datasets and
       runtime uploads alike. It survives a <b>Reset demo</b> (the operational model rebuilds; the document
       history does not). Each row shows what the file became: which objects it fed, how many pointer rows,
@@ -588,7 +608,7 @@
 
   <!-- INGEST -->
   <section id="ingest" class="panel">
-    <h2>Data ingestion — land → profile → propose → confirm → commit</h2>
+    <h2>Data Upload — land → profile → map → commit</h2>
     <div id="ingest-stats" class="stat-row"></div>
     <p class="muted">Drop <b>any</b> file — CSV, Excel, JSON, PDF, Word, or an unstructured note. Spreadsheets
       parse locally; PDFs and prose are read by Claude into rows. Then the LLM maps every column to the
@@ -656,7 +676,7 @@
 
   <!-- COMPANIES -->
   <section id="companies" class="panel">
-    <h2>Companies tracked</h2>
+    <h2>Suppliers</h2>
     <p class="muted">Every entity the platform holds data on — across all domains. Click a company to see it
       everywhere: its documents, the objects &amp; properties holding its data, and the projects it appears in.</p>
     <div class="narr-search">
@@ -667,10 +687,85 @@
 
   <!-- PROJECTS -->
   <section id="projects" class="panel">
-    <h2>Projects</h2>
+    <h2>Programs</h2>
     <p class="muted">Every project files were ingested under (named at upload, or seeded). Click a project to
       drill into the documents and objects it contains.</p>
     <div id="projects-list"></div>
+  </section>
+
+  <!-- DATA ONTOLOGY: data source identification -->
+  <section id="sources" class="panel">
+    <h2>Data source identification</h2>
+    <p class="muted">Every raw source connected to the model, and the business objects it feeds — so you can see
+      where each fact originates.</p>
+    <div id="sources-list"></div>
+  </section>
+
+  <!-- DATA TEMPLATES: dashboard -->
+  <section id="tpl-dashboard" class="panel">
+    <h2>Data Templates — dashboard</h2>
+    <p class="muted">Custom structured outputs generated from everything ingested on the platform. Build one under
+      <b>Templates</b>; every run is tracked under <b>Query tracking</b>.</p>
+    <div id="tpl-dash"></div>
+  </section>
+
+  <!-- DATA TEMPLATES: templates (the core feature) -->
+  <section id="tpl-templates" class="panel">
+    <h2>Templates — generate structured data</h2>
+    <p class="muted">Produce a custom structured output from all ingested/uploaded data, two ways:
+      <b>①</b> upload a template with the <b>column headers</b> you want and the system populates the rows; or
+      <b>②</b> write a plain-English <b>retrieval query</b> and get a structured table back. Then view or download it.</p>
+
+    <div class="card" style="padding:16px 18px; margin-bottom:16px;">
+      <div class="question-chips" style="margin-bottom:6px;">
+        <button class="q-chip chip-on" id="tpl-mode-tpl">① Upload / define a template</button>
+        <button class="q-chip" id="tpl-mode-q">② Agentic retrieval query</button>
+      </div>
+      <div id="tpl-upload-block">
+        <div class="muted" style="margin:10px 0 6px;">Upload a CSV/Excel whose <b>first row is your column headers</b> — or type the headers below. The system fills the rows from the ingested data.</div>
+        <input type="file" id="tpl-file" accept=".csv,.tsv,.xlsx">
+        <div style="margin-top:8px;"><input type="text" id="tpl-headers" placeholder="or type headers, comma-separated — e.g. material, cas, reach_status, program, supplier" style="width:100%;"></div>
+      </div>
+      <div id="tpl-query-block" class="hidden">
+        <div class="muted" style="margin:10px 0 6px;">Describe what you want; the agent formats the answer as a structured table.</div>
+        <input type="text" id="tpl-q-input" placeholder="e.g. every SVHC material with its CAS, REACH status, supplier and the programs affected" style="width:100%;">
+      </div>
+      <div style="margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <input type="text" id="tpl-name" placeholder="Name this output (optional)" style="width:240px;">
+        <button class="btn btn-primary" id="tpl-generate">⚙ Generate</button>
+        <button class="btn btn-ghost hidden" id="tpl-download">⬇ Download CSV</button>
+        <span id="tpl-status" class="muted"></span>
+      </div>
+    </div>
+    <div id="tpl-result"></div>
+  </section>
+
+  <!-- DATA TEMPLATES: data category -->
+  <section id="tpl-category" class="panel">
+    <h2>Data Category</h2>
+    <p class="muted">The objects/categories available to build templates from — pick fields from any of these.</p>
+    <div id="tpl-cat"></div>
+  </section>
+
+  <!-- DATA TEMPLATES: query tracking -->
+  <section id="tpl-query" class="panel">
+    <h2>Query tracking</h2>
+    <p class="muted">Every template generated and agentic query run — reproducible, re-runnable and downloadable.</p>
+    <div id="tpl-track"></div>
+  </section>
+
+  <!-- AGENTS: substitution -->
+  <section id="agent-substitution" class="panel">
+    <h2>Substitution Agent</h2>
+    <p class="muted">Focused on chrome-free / cadmium-free / SVHC substitution — options, qualification status and program readiness.</p>
+    <div id="sub-agent"></div>
+  </section>
+
+  <!-- AGENTS: audit & exposure -->
+  <section id="agent-audit" class="panel">
+    <h2>Audit &amp; Exposure Agent</h2>
+    <p class="muted">Focused on SDS currency, supplier REACH-registration status, exposure scenarios and audit readiness.</p>
+    <div id="audit-agent"></div>
   </section>
 </main>
 </div>
