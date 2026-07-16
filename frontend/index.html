@@ -684,33 +684,52 @@
 
   <!-- DATA TEMPLATES: templates (the core feature) -->
   <section id="tpl-templates" class="panel">
-    <h2>Templates — generate structured data</h2>
-    <p class="muted">Produce a custom structured output from all ingested/uploaded data, two ways:
-      <b>①</b> upload a template with the <b>column headers</b> you want and the system populates the rows; or
-      <b>②</b> write a plain-English <b>retrieval query</b> and get a structured table back. Then view or download it.</p>
+    <h2>Templates — generate structured outputs from the model</h2>
+    <p class="muted">Turn the whole model into exactly the table you need. <b>Populate a template</b> — give it the
+      columns and it fills the rows from live data — or run a <b>retrieval query</b> in plain English. Either way
+      the output is grounded, structured, and one click from CSV.</p>
 
-    <div class="card" style="padding:16px 18px; margin-bottom:16px;">
-      <div class="question-chips" style="margin-bottom:6px;">
-        <button class="q-chip chip-on" id="tpl-mode-tpl">① Upload / define a template</button>
-        <button class="q-chip" id="tpl-mode-q">② Agentic retrieval query</button>
+    <div class="tpl-workbench">
+      <div class="tpl-config">
+        <div class="tpl-modes">
+          <button class="tpl-mode on" data-m="template">Populate a template</button>
+          <button class="tpl-mode" data-m="query">Retrieval query</button>
+        </div>
+
+        <div id="tpl-upload-block">
+          <div class="tpl-label">Columns</div>
+          <label class="tpl-drop" id="tpl-drop">
+            <input type="file" id="tpl-file" accept=".csv,.tsv,.xlsx" hidden>
+            <div class="tpl-drop-ic">⬍</div>
+            <div class="tpl-drop-t">Drop a CSV / Excel, or click to browse</div>
+            <div class="tpl-drop-s">its header row becomes your columns</div>
+          </label>
+          <textarea id="tpl-headers" class="tpl-ta" rows="2" placeholder="…or type headers, comma-separated"></textarea>
+          <div class="tpl-quick" id="tpl-quick-h"></div>
+        </div>
+
+        <div id="tpl-query-block" class="hidden">
+          <div class="tpl-label">What do you want?</div>
+          <textarea id="tpl-q-input" class="tpl-ta" rows="3" placeholder="Describe the structured output you need…"></textarea>
+          <div class="tpl-quick" id="tpl-quick-q"></div>
+        </div>
+
+        <div class="tpl-label">Name <span class="muted">(optional)</span></div>
+        <input type="text" id="tpl-name" class="tpl-in" placeholder="e.g. G700 SVHC exposure sheet">
+
+        <button class="btn btn-primary tpl-gen" id="tpl-generate">Generate output</button>
+        <div id="tpl-status" class="tpl-status"></div>
       </div>
-      <div id="tpl-upload-block">
-        <div class="muted" style="margin:10px 0 6px;">Upload a CSV/Excel whose <b>first row is your column headers</b> — or type the headers below. The system fills the rows from the ingested data.</div>
-        <input type="file" id="tpl-file" accept=".csv,.tsv,.xlsx">
-        <div style="margin-top:8px;"><input type="text" id="tpl-headers" placeholder="or type headers, comma-separated — e.g. material, cas, reach_status, program, supplier" style="width:100%;"></div>
-      </div>
-      <div id="tpl-query-block" class="hidden">
-        <div class="muted" style="margin:10px 0 6px;">Describe what you want; the agent formats the answer as a structured table.</div>
-        <input type="text" id="tpl-q-input" placeholder="e.g. every SVHC material with its CAS, REACH status, supplier and the programs affected" style="width:100%;">
-      </div>
-      <div style="margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-        <input type="text" id="tpl-name" placeholder="Name this output (optional)" style="width:240px;">
-        <button class="btn btn-primary" id="tpl-generate">⚙ Generate</button>
-        <button class="btn btn-ghost hidden" id="tpl-download">⬇ Download CSV</button>
-        <span id="tpl-status" class="muted"></span>
+
+      <div class="tpl-output" id="tpl-output">
+        <div id="tpl-result" class="tpl-empty">
+          <div class="tpl-empty-t">Your structured output appears here</div>
+          <div class="tpl-empty-s">Configure the columns or a query on the left, then Generate. Every value is
+            pulled from the live model and traceable to source.</div>
+        </div>
+        <button class="btn btn-ghost tpl-dl hidden" id="tpl-download">⬇ Download CSV</button>
       </div>
     </div>
-    <div id="tpl-result"></div>
   </section>
 
   <!-- DATA TEMPLATES: data category -->

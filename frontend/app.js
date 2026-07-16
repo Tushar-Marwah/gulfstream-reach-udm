@@ -1316,27 +1316,44 @@ async function openSourceDrawer(s) {
 
 // ---- DATA TEMPLATES ------------------------------------------------------
 let tplMode = "template", tplLast = null;
+const TPL_QUICK_H = ["material, cas, reach_status, supplier, program",
+  "part_number, program, material, base_chemical", "supplier, country, reach_registered, approval_status"];
+const TPL_QUICK_Q = ["every SVHC material with its CAS, REACH status, supplier and the programmes affected",
+  "chemicals on Annex XIV with their sunset dates and where they're used",
+  "suppliers that aren't confirmed REACH-registered and what they supply"];
 
 function loadTemplates() {
-  const modeTpl = $("#tpl-mode-tpl"), modeQ = $("#tpl-mode-q");
-  if (modeTpl && !modeTpl._wired) {
-    modeTpl._wired = true;
+  const modeBtns = $$(".tpl-mode");
+  if (modeBtns.length && !modeBtns[0]._wired) {
+    modeBtns[0]._wired = true;
     const setMode = (m) => {
       tplMode = m;
-      modeTpl.classList.toggle("chip-on", m === "template");
-      modeQ.classList.toggle("chip-on", m === "query");
+      modeBtns.forEach(b => b.classList.toggle("on", b.dataset.m === m));
       $("#tpl-upload-block").classList.toggle("hidden", m !== "template");
       $("#tpl-query-block").classList.toggle("hidden", m !== "query");
     };
-    modeTpl.addEventListener("click", () => setMode("template"));
-    modeQ.addEventListener("click", () => setMode("query"));
-    $("#tpl-file").addEventListener("change", async (e) => {
-      const f = e.target.files[0]; if (!f) return;
+    modeBtns.forEach(b => b.addEventListener("click", () => setMode(b.dataset.m)));
+
+    // drop zone / file
+    const readHeaders = async (f) => {
       const text = await f.text();
       const firstLine = (text.split(/\r?\n/)[0] || "");
       const sep = firstLine.includes("\t") ? "\t" : ",";
       $("#tpl-headers").value = firstLine.split(sep).map(s => s.trim().replace(/^"|"$/g, "")).filter(Boolean).join(", ");
-    });
+      $("#tpl-drop").classList.add("has");
+    };
+    $("#tpl-file").addEventListener("change", e => { if (e.target.files[0]) readHeaders(e.target.files[0]); });
+    const dz = $("#tpl-drop");
+    ["dragover", "dragenter"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("over"); }));
+    ["dragleave", "drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("over"); }));
+    dz.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) readHeaders(f); });
+
+    // quick chips
+    const qh = $("#tpl-quick-h");
+    TPL_QUICK_H.forEach(t => { const c = el("button", "tpl-chip", esc(t)); c.addEventListener("click", () => $("#tpl-headers").value = t); qh.appendChild(c); });
+    const qq = $("#tpl-quick-q");
+    TPL_QUICK_Q.forEach(t => { const c = el("button", "tpl-chip", esc(t)); c.addEventListener("click", () => $("#tpl-q-input").value = t); qq.appendChild(c); });
+
     $("#tpl-generate").addEventListener("click", generateTemplate);
     $("#tpl-download").addEventListener("click", () => {
       if (tplLast) downloadCsv(tplLast.columns, tplLast.rows, (tplLast.name || "output") + ".csv");
@@ -1350,15 +1367,18 @@ async function generateTemplate() {
   const body = { mode: tplMode, name };
   if (tplMode === "template") {
     body.headers = $("#tpl-headers").value.split(",").map(s => s.trim()).filter(Boolean);
-    if (!body.headers.length) { status.textContent = "Add some column headers first."; return; }
+    if (!body.headers.length) { status.textContent = "Add column headers (or drop a file) first."; return; }
   } else {
     body.query = $("#tpl-q-input").value.trim();
-    if (!body.query) { status.textContent = "Type a query first."; return; }
+    if (!body.query) { status.textContent = "Describe the output you want first."; return; }
   }
   status.textContent = "";
+  const btn = $("#tpl-generate"); btn.disabled = true; btn.textContent = "Generating…";
   $("#tpl-download").classList.add("hidden");
-  result.innerHTML = '<div class="spinner">Generating from the model… the agent is retrieving & formatting your data.</div>';
+  result.className = "";
+  result.innerHTML = '<div class="tpl-working"><span class="aip-mini-spin"></span> Retrieving from the live model and formatting your output…</div>';
   const r = await api("/api/template/generate", body);
+  btn.disabled = false; btn.textContent = "Generate output";
   if (!r.ok) { result.innerHTML = `<div class="empty">${esc(r.error || "Generation failed.")}</div>`; return; }
   tplLast = r;
   renderTplResult(r);
@@ -1366,18 +1386,17 @@ async function generateTemplate() {
 }
 
 function renderTplResult(r) {
-  const result = $("#tpl-result");
-  result.innerHTML = "";
-  const rows = r.rows.map(row => {
-    const o = {}; r.columns.forEach((c, i) => o[c] = row[i]); return o;
-  });
-  result.appendChild(el("div", "interp",
-    `<span class="badge badge-new">generated</span> <b>${esc(r.name || "output")}</b> — ${r.rows.length} row(s), ${r.columns.length} column(s).
-     ${r.note ? "<br><span class='muted'>" + esc(r.note) + "</span>" : ""}
-     ${r.cost_usd ? "<br><span class='muted'>engine: " + esc(r.engine) + " · $" + Number(r.cost_usd).toFixed(5) + "</span>" : ""}`));
-  const card = el("div", "card"); card.style.marginTop = "10px";
-  card.appendChild(el("div", "card-head",
-    `<span class="name">${esc(r.mode === "template" ? "populated template" : "query result")}</span><span class="meta">${esc(r.spec)}</span>`));
+  const result = $("#tpl-result"); result.className = ""; result.innerHTML = "";
+  const rows = r.rows.map(row => { const o = {}; r.columns.forEach((c, i) => o[c] = row[i]); return o; });
+  const head = el("div", "tpl-res-head");
+  head.innerHTML = `<div class="tpl-res-title">${esc(r.name || (r.mode === "template" ? "Populated template" : "Query result"))}</div>
+    <div class="tpl-res-meta"><span class="badge badge-auto">${r.rows.length} rows</span>
+      <span class="badge badge-new">${r.columns.length} columns</span>
+      <span class="badge badge-soft">${r.mode === "template" ? "template" : "query"}</span></div>`;
+  const dl = $("#tpl-download"); if (dl) head.querySelector(".tpl-res-meta").appendChild(dl);
+  result.appendChild(head);
+  if (r.note) result.appendChild(el("div", "tpl-res-note", esc(r.note)));
+  const card = el("div", "card"); card.style.marginTop = "12px";
   card.appendChild(dataTable(r.columns, rows, 500));
   result.appendChild(card);
 }
