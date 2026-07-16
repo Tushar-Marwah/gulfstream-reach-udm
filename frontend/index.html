@@ -146,10 +146,10 @@
     <h3 class="glossary-h reveal">Terms glossary <span class="muted">— every word used below, defined once</span></h3>
     <div class="glossary reveal">
       <div><b>Raw data</b> — your files, kept exactly as they arrived (messy values and all).</div>
-      <div><b>Object</b> — a business thing you track. A noun: Brand, Product, Company.</div>
-      <div><b>Property</b> — one fact about an object: a price, a margin, a score.</div>
+      <div><b>Object</b> — a business thing you track. A noun: Chemical, Material, Part.</div>
+      <div><b>Property</b> — one fact about an object: a flash point, a hazard class, a REACH status.</div>
       <div><b>Pointer (binding)</b> — says <i>where</i> a fact lives in the raw files, plus the rule to clean it.</div>
-      <div><b>Link</b> — a relationship between objects: “competes-with”, “sells”.</div>
+      <div><b>Link</b> — a relationship between objects: “contains”, “applies-to”.</div>
       <div><b>Meaning layer / ontology</b> — the whole map of objects, pointers &amp; links. Holds <i>no</i> data.</div>
       <div><b>Resolver</b> — the part that turns your question into a database query.</div>
       <div><b>SQL</b> — the standard language for asking a database for data.</div>
@@ -238,24 +238,24 @@
       Each property doesn't <i>store</i> a value — it <b>points</b> at a column in a raw file. The object itself
       holds no data; it's a clean set of labelled pointers.</p>
     <svg class="flow-svg diagram-block reveal" viewBox="0 0 980 260" xmlns="http://www.w3.org/2000/svg" role="img"
-         aria-label="The Product object's properties each point at a column in the raw t_specs table">
+         aria-label="The Material object's properties each point at a column in the raw t_materials table">
       <defs><marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
         <path d="M1 1 L8 5 L1 9" fill="none" stroke="#5a6b82" stroke-width="1.6" stroke-linecap="round"/></marker></defs>
       <g class="fb on"><rect x="30" y="34" width="250" height="196" rx="10"/>
         <text x="155" y="60" class="ft">Object · Material</text>
         <text x="155" y="78" class="fs">a business thing · holds no data</text>
-        <text x="55" y="118" class="fp">sku</text><text x="55" y="150" class="fp">tds</text>
-        <text x="55" y="182" class="fp">mrp</text><text x="55" y="214" class="fp">certifications</text></g>
+        <text x="55" y="118" class="fp">name</text><text x="55" y="150" class="fp">spec</text>
+        <text x="55" y="182" class="fp">base_chemical</text><text x="55" y="214" class="fp">supplier</text></g>
       <g class="fb"><rect x="700" y="34" width="250" height="196" rx="10"/>
-        <text x="825" y="60" class="ft">Raw file · t_chemicals</text>
+        <text x="825" y="60" class="ft">Raw file · t_materials</text>
         <text x="825" y="78" class="fs">stored exactly as it arrived</text>
-        <text x="720" y="118" class="fp">product = <tspan class="fpv">44GN098</tspan></text>
-        <text x="720" y="150" class="fp">tds = <tspan class="fpv">120</tspan></text>
-        <text x="720" y="182" class="fp">mrp = <tspan class="fpv">20</tspan></text>
-        <text x="720" y="214" class="fp">certs = <tspan class="fpv">BIS, ISI</tspan></text></g>
-      <text x="490" y="106" class="elabel">parse_sku</text>
-      <text x="490" y="138" class="elabel">to_int</text>
-      <text x="490" y="170" class="elabel">to_int</text>
+        <text x="720" y="118" class="fp">name = <tspan class="fpv">44GN098</tspan></text>
+        <text x="720" y="150" class="fp">spec = <tspan class="fpv">BMS 10-11</tspan></text>
+        <text x="720" y="182" class="fp">base_chem = <tspan class="fpv">7789-06-2</tspan></text>
+        <text x="720" y="214" class="fp">supplier = <tspan class="fpv">PPG</tspan></text></g>
+      <text x="490" y="106" class="elabel">(direct)</text>
+      <text x="490" y="138" class="elabel">(direct)</text>
+      <text x="490" y="170" class="elabel">map_cas</text>
       <text x="490" y="202" class="elabel">(direct)</text>
       <line x1="282" y1="114" x2="698" y2="114" class="edge flow" marker-end="url(#ar2)"/>
       <line x1="282" y1="146" x2="698" y2="146" class="edge flow" marker-end="url(#ar2)"/>
@@ -267,7 +267,7 @@
     <h3 class="reveal">② What a <i>pointer</i> (binding) is — a contacts list for your data</h3>
     <p class="diagram-note reveal">You never dial a raw phone number — you tap a name and the phone looks it up.
       A <b>pointer</b> works the same way: the agent asks for <code>Material.base_chemical</code>; the resolver looks up the
-      pointer and reads the real column. The pointer also carries the <b>clean rule</b> (strip ₹, convert crore→mn)
+      pointer and reads the real column. The pointer also carries the <b>clean rule</b> (normalise units, map CAS)
       — that's where all the intelligence lives.</p>
     <svg class="flow-svg diagram-block reveal" viewBox="0 0 980 200" xmlns="http://www.w3.org/2000/svg" role="img"
          aria-label="Contacts-list analogy: tapping a name dials a number; asking an object property reads a raw column">
@@ -280,7 +280,7 @@
       <line x1="392" y1="56" x2="558" y2="56" class="edge flow" marker-end="url(#ar3)"/>
       <text x="20" y="146" class="fs" style="text-anchor:start">The ontology</text>
       <g class="fb on"><rect x="150" y="122" width="240" height="48" rx="9"/><text x="270" y="151" class="fp" style="text-anchor:middle">ask “Material.base_chemical”</text></g>
-      <g class="fb"><rect x="560" y="122" width="300" height="48" rx="9"/><text x="710" y="151" class="fpv" style="text-anchor:middle">reads t_specs.tds = 120</text></g>
+      <g class="fb"><rect x="560" y="122" width="300" height="48" rx="9"/><text x="710" y="151" class="fpv" style="text-anchor:middle">reads t_materials.base_chem = 7789-06-2</text></g>
       <text x="475" y="138" class="verb">resolver looks up + reads</text>
       <line x1="392" y1="146" x2="558" y2="146" class="edge flow" marker-end="url(#ar3)"/>
     </svg>
@@ -362,7 +362,7 @@
     </svg>
     <p class="diagram-note reveal"><b>Step by step:</b> ① the agent reads the question and decides which objects hold a
       slice of it. ② it asks each object only what it can answer. ③ the resolver turns every ask into real SQL over
-      the right raw file, joining <i>across</i> objects on shared keys (<code>brand</code>, <code>sku</code>) and the
+      the right raw file, joining <i>across</i> objects on shared keys (<code>CAS</code>, <code>material_id</code>) and the
       links. ④ clean rows + retrieved narrative come back, and the agent fuses them into one cited answer.
       The same machinery runs for <b>any</b> company or scenario — only the set of objects asked changes.</p>
 
@@ -445,7 +445,7 @@
       </div>
 
       <div class="faq-item">
-        <button class="faq-q">How do you handle different units — crore vs millions, ₹ vs $?</button>
+        <button class="faq-q">How do you handle different units — ppm vs mg/m³, °C vs °F?</button>
         <div class="faq-a"><p>Every pointer carries a small conversion rule, so values are <b>normalised on the way
           out</b> and everything becomes comparable. Where a currency or scale is ambiguous, it's flagged for a human
           to confirm rather than guessed.</p></div>
@@ -453,7 +453,7 @@
 
       <div class="faq-item">
         <button class="faq-q">Who can see what? Is sensitive data protected?</button>
-        <div class="faq-a"><p>Yes. Access is role-based: sensitive fields like revenue or margins are <b>hidden from
+        <div class="faq-a"><p>Yes. Access is role-based: sensitive fields like supplier pricing or formulations are <b>hidden from
           viewers</b>, changes need approval, and every action is logged. Different teams or clients can be walled
           off from each other while sharing the same model.</p></div>
       </div>
