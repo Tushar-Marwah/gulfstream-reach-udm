@@ -1224,15 +1224,15 @@ function initOverviewDemo() {
 
   // captions for the silent, self-paced walkthrough (no voice-over)
   const NAR = [
-    { scene: 1, cap: "One view of the whole model: a <b>business question</b> at the top, the <b>objects you govern</b> in the middle — Part, Material, Chemical, Compliance — and your <b>source records</b> at the bottom. Watch a single question flow through all three, fully traceable." },
-    { scene: 2, cap: "It begins with a question in <b>plain business language</b> — no query syntax, no data-science skills required. Here: <b>“Which G700 materials contain a REACH SVHC?”</b>" },
-    { scene: 3, cap: "The platform decomposes that question into the <b>business objects</b> that can answer it. <span class='def'>Objects are the real-world things you manage — a material, a chemical, a regulation — not raw database tables.</span>" },
-    { scene: 4, cap: "Each object resolves <b>through a governed pointer</b> to where the fact actually lives in your systems. The object stores no data itself — only a controlled reference, so there is a single source of truth." },
-    { scene: 5, cap: "Those pointers <b>retrieve the live values on demand</b>, generating the underlying query automatically. Nothing is copied or duplicated — the model always reads from the system of record." },
-    { scene: 6, cap: "Values return <b>normalised and reconciled</b> — units aligned, CAS numbers mapped, formats standardised — so data from different suppliers and systems becomes directly comparable." },
-    { scene: 7, cap: "Unstructured evidence joins too: <b>safety data sheets and substitution notes</b> are retrieved alongside the structured facts, so no relevant context is left behind." },
-    { scene: 8, cap: "Structured data and documentation <b>converge into one connected view</b> — the links between part, material, chemical and regulation are resolved in a single pass." },
-    { scene: 9, cap: "The result is one <b>fully-cited answer</b>, traceable to its exact source. <b>Nothing was pre-computed</b> — the identical path runs for any question, any programme, any regulation." },
+    { scene: 1, cap: "Three tiers, one line of sight — the <b>question</b> you are actually asking at the top, the <b>ontology</b> you govern in the middle, the <b>systems of record</b> beneath. The model exists to close the distance between them." },
+    { scene: 2, cap: "Every decision begins with a question in plain language — no schema, no query, no analyst in the loop: <i>“Which G700 materials contain a REACH SVHC?”</i>" },
+    { scene: 3, cap: "The question resolves against the <b>ontology</b> — a semantic layer that models the operation as <b>objects, not tables</b>. Part, Material, Chemical, Compliance are the concepts the business already reasons in." },
+    { scene: 4, cap: "Each object is a set of <b>governed pointers</b>, never a copy. Meaning is <b>decoupled from storage</b>: the ontology defines what a Material <i>is</i>, while the record of it stays exactly where it lives." },
+    { scene: 5, cap: "On demand, the pointers <b>resolve to the live record</b> — the query generated, executed and returned in one motion. No warehouse to sync, no extract to age: the model reads truth the moment it is asked." },
+    { scene: 6, cap: "Heterogeneous inputs are <b>reconciled to one semantics</b> — units, CAS identifiers and formats normalised — so every value is directly comparable. Integration becomes a <b>property of the model</b>, not a project." },
+    { scene: 7, cap: "Structured facts are joined by <b>unstructured evidence</b> — safety data sheets, substitution notes — in the same pass. At query time, the line between a database and a document disappears." },
+    { scene: 8, cap: "The relationships do the work: <b>part → material → chemical → regulation</b> resolve as a graph, not a join you had to foresee. The answer emerges from the <b>shape of the ontology</b> itself." },
+    { scene: 9, cap: "What returns is one <b>fully-cited answer</b> — traceable to source, reproducible on demand. <b>Nothing was pre-computed</b>; the same path generalises to any question, any programme, any regulation." },
   ];
   // rough reading time per caption
   function holdMs(html) {
