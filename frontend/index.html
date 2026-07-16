@@ -49,12 +49,7 @@
     <button class="tab" data-tab="tpl-query">Query tracking</button>
   </div>
 
-  <button class="mod" data-mod="agents">Agents<span class="caret">▾</span></button>
-  <div class="submod" id="mod-agents">
-    <button class="tab" data-tab="agent">Compliance Agent</button>
-    <button class="tab" data-tab="agent-substitution">Substitution Agent</button>
-    <button class="tab" data-tab="agent-audit">Audit &amp; Exposure Agent</button>
-  </div>
+  <button class="tab tab-solo" data-tab="agent">✦ Agentic AI</button>
 
   <button class="mod" data-mod="track">Tracking<span class="caret">▾</span></button>
   <div class="submod" id="mod-track">
@@ -568,18 +563,43 @@
 
   <!-- AGENT -->
   <section id="agent" class="panel">
-    <h2>Ask the agent</h2>
-    <p class="muted">The agent speaks objects, never raw tables. Watch a question become an object query,
-      then real SQL, then a cited answer.</p>
-    <div id="suggested" class="chips question-chips"></div>
-    <div class="ask-row">
-      <input id="question" type="text" placeholder="Ask about REACH SVHCs, materials, or a program…" autocomplete="off">
-      <label id="llm-toggle-wrap" class="llm-toggle hidden">
-        <input type="checkbox" id="use-llm"> use Claude
-      </label>
-      <button id="ask-btn" class="btn btn-primary">Ask</button>
+    <div class="ag-head">
+      <div>
+        <h2>Agentic AI</h2>
+        <p class="muted">Reasoning agents over the REACH / materials ontology — never raw tables. Work in
+          <b>guided</b> mode from ready-made scenarios, or ask anything in <b>free chat</b>. Every answer is planned,
+          resolved and cited.</p>
+      </div>
+      <div class="ag-status"><span class="ag-dot"></span> Context synchronized · Materials &amp; Chemical Compliance</div>
     </div>
-    <div id="agent-result"></div>
+
+    <div class="ag-modes">
+      <button class="ag-mode on" data-mode="guided">◆ Guided</button>
+      <button class="ag-mode" data-mode="chat">💬 Free chat</button>
+    </div>
+
+    <!-- GUIDED MODE -->
+    <div id="ag-guided">
+      <div id="ag-back" class="ag-back hidden"><span>←</span> Back to scenarios</div>
+      <div id="ag-scenarios">
+        <span class="ag-section-title">Analysis scenarios</span>
+        <div class="ag-grid" id="ag-grid"></div>
+      </div>
+      <div id="ag-run" class="hidden"></div>
+    </div>
+
+    <!-- FREE CHAT MODE -->
+    <div id="ag-chat" class="hidden">
+      <div id="suggested" class="chips question-chips"></div>
+      <div class="ask-row">
+        <input id="question" type="text" placeholder="Ask about REACH SVHCs, materials, suppliers, or a program…" autocomplete="off">
+        <label id="llm-toggle-wrap" class="llm-toggle hidden">
+          <input type="checkbox" id="use-llm"> use Claude
+        </label>
+        <button id="ask-btn" class="btn btn-primary">Ask</button>
+      </div>
+      <div id="agent-result"></div>
+    </div>
   </section>
 
   <!-- CONSOLE (operations / governance control plane) -->

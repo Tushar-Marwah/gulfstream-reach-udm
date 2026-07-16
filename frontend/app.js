@@ -123,8 +123,8 @@ const loaders = {
   sources: loadSources,
   "tpl-dashboard": loadTplDashboard, "tpl-templates": loadTemplates,
   "tpl-category": loadTplCategory, "tpl-query": loadTplQuery,
-  "agent-substitution": loadSubAgent, "agent-audit": loadAuditAgent,
 };
+loaders.agent = loadAgentic;
 
 // ---- control plane: context (role / branch / workspace) -----------------
 let CTX = { actor: "Admin", role: "Admin", branch: "main", workspace: "Global", perms: [] };
@@ -906,58 +906,104 @@ function renderAgentInto(host, r) {
   host.appendChild(ans);
 }
 
-// ---- reusable embedded agent (for Substitution / Audit agent tabs) -------
-function mountAgent(hostSel, opts) {
-  const host = $(hostSel);
-  if (!host || host._wired) { if (host && host._wired) return; }
-  host._wired = true;
-  host.innerHTML = `
-    <div class="question-chips" data-role="chips"></div>
-    <div class="ask-row">
-      <input type="text" data-role="q" placeholder="${esc(opts.placeholder || "Ask a question…")}">
-      <button class="btn btn-primary" data-role="go">Ask</button>
-    </div>
-    <div data-role="result"></div>`;
-  const qi = host.querySelector('[data-role=q]');
-  const res = host.querySelector('[data-role=result]');
-  const chips = host.querySelector('[data-role=chips]');
-  (opts.suggested || []).forEach(q => {
-    const c = el("button", "q-chip", esc(q));
-    c.addEventListener("click", () => { qi.value = q; go(); });
-    chips.appendChild(c);
-  });
-  async function go() {
-    const q = qi.value.trim(); if (!q) return;
-    res.innerHTML = '<div class="spinner">Thinking…</div>';
-    const framed = opts.framing ? opts.framing + " " + q : q;
-    renderAgentInto(res, await api("/api/agent", { question: framed, use_llm: true }));
+// ---- AGENTIC AI: guided scenarios + free chat --------------------------
+const AG_SCENARIOS = [
+  { id: "svhc", icon: "⚠️", tag: "COMPLIANCE",
+    label: "Find REACH SVHCs across a programme",
+    q: "Which materials contain a REACH SVHC, and which programmes and parts are affected?",
+    steps: ["Scan Chemical objects for SVHC / Annex XIV flags", "Join Material → Chemical on CAS",
+      "Trace Part → Programme through the link graph", "Compile a cited answer"] },
+  { id: "subst", icon: "🔄", tag: "SUBSTITUTION",
+    label: "Map substitution options for a substance",
+    q: "What are the chrome-free and cadmium-free alternatives to the substances in use, and what is their qualification status?",
+    steps: ["Identify hazardous substances in scope", "Retrieve substitution notes from the narrative store",
+      "Cross-check qualification status per material", "Summarise viable drop-in alternatives"] },
+  { id: "trace", icon: "🧭", tag: "TRACEABILITY",
+    label: "Trace where a chemical is used",
+    q: "Trace where strontium chromate is used — from chemical to material to part to programme.",
+    steps: ["Resolve the Chemical by CAS", "Follow Material containsChemical", "Follow Part madeOf → usedOn Programme",
+      "Assemble the end-to-end usage path"] },
+  { id: "annex", icon: "⏳", tag: "DEADLINES",
+    label: "Authorisation-list sunset exposure",
+    q: "Which chemicals are on the REACH Authorisation List (Annex XIV), and what are their sunset dates?",
+    steps: ["Filter Chemical objects by Annex XIV status", "Read restriction reference and deadline",
+      "Rank by nearest sunset date", "Return a dated exposure list"] },
+  { id: "supplier", icon: "🏭", tag: "SUPPLY CHAIN",
+    label: "Assess supplier REACH registration",
+    q: "Which suppliers are not confirmed REACH-registered, and what materials do they supply?",
+    steps: ["Read Supplier approval / registration status", "Join Supplier → Material",
+      "Flag unconfirmed registrations", "Report exposure by supplier"] },
+  { id: "exposure", icon: "🧪", tag: "SAFETY",
+    label: "Exposure limits & hazard profile",
+    q: "What are the exposure limits and hazard statements for the substances still in use?",
+    steps: ["Collect Chemical hazard + exposure properties", "Normalise exposure limits to ppm",
+      "Attach GHS hazard statements", "Compile a safety summary"] },
+];
+
+let agWired = false;
+function loadAgentic() {
+  const grid = $("#ag-grid");
+  if (grid && !grid._built) {
+    grid._built = true;
+    AG_SCENARIOS.forEach(s => {
+      const card = el("div", "ag-card");
+      card.innerHTML = `<div class="ag-card-ic">${s.icon}</div>
+        <div class="ag-card-label">${esc(s.label)}</div>
+        <div class="ag-card-tag">${esc(s.tag)}</div>`;
+      card.addEventListener("click", () => runScenario(s));
+      grid.appendChild(card);
+    });
   }
-  host.querySelector('[data-role=go]').addEventListener("click", go);
-  qi.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+  if (!agWired) {
+    agWired = true;
+    $$(".ag-mode").forEach(b => b.addEventListener("click", () => {
+      $$(".ag-mode").forEach(x => x.classList.remove("on"));
+      b.classList.add("on");
+      const m = b.dataset.mode;
+      $("#ag-guided").classList.toggle("hidden", m !== "guided");
+      $("#ag-chat").classList.toggle("hidden", m !== "chat");
+    }));
+    if ($("#ag-back")) $("#ag-back").addEventListener("click", agBack);
+  }
+  loadAgentMeta();   // populate free-chat suggestions + Claude toggle
 }
 
-function loadSubAgent() {
-  mountAgent("#sub-agent", {
-    placeholder: "e.g. What can replace strontium chromate in the G700 wing primer?",
-    framing: "Focus on substitution / drop-in alternatives and their qualification status.",
-    suggested: [
-      "What are the chrome-free alternatives to strontium chromate primers, and are they qualified?",
-      "Which cadmium-plated parts have a viable substitution, and on which programs?",
-      "Where is hexavalent chromium still in use, and what is the migration path?",
-    ],
-  });
+function agBack() {
+  $("#ag-scenarios").classList.remove("hidden");
+  $("#ag-back").classList.add("hidden");
+  const run = $("#ag-run"); run.classList.add("hidden"); run.innerHTML = "";
 }
 
-function loadAuditAgent() {
-  mountAgent("#audit-agent", {
-    placeholder: "e.g. Which SDS records are overdue for revision?",
-    framing: "Focus on SDS currency, supplier REACH registration, exposure scenarios and audit readiness.",
-    suggested: [
-      "Which suppliers are not confirmed REACH-registered, and what do they supply?",
-      "What are the exposure limits and hazard statements for the substances we still use?",
-      "Which chemicals are on Annex XIV, and what are their sunset dates?",
-    ],
-  });
+async function runScenario(s) {
+  $("#ag-scenarios").classList.add("hidden");
+  $("#ag-back").classList.remove("hidden");
+  const run = $("#ag-run"); run.classList.remove("hidden");
+  run.innerHTML = `
+    <div class="ag-run-head">
+      <span class="ag-card-ic">${s.icon}</span>
+      <div><div class="ag-run-title">${esc(s.label)}</div><div class="ag-card-tag">${esc(s.tag)}</div></div>
+    </div>
+    <div class="ag-reason">
+      <div class="ag-reason-title">Reasoning path</div>
+      <div class="ag-steps" id="ag-steps"></div>
+    </div>
+    <div id="ag-answer"></div>`;
+  const host = $("#ag-steps");
+  s.steps.forEach((st, i) => host.appendChild(
+    el("div", "ag-step", `<span class="ag-step-node">${i + 1}</span><span class="ag-step-text">${esc(st)}</span>`)));
+  const stepEls = $$(".ag-step", host);
+  let i = 0;
+  const advance = () => {
+    if (i > 0) { const p = stepEls[i - 1]; p.classList.remove("active"); p.classList.add("done"); p.querySelector(".ag-step-node").textContent = "✓"; }
+    if (i < stepEls.length) { stepEls[i].classList.add("active"); i++; }
+  };
+  advance();
+  const timer = setInterval(advance, 750);
+  let r;
+  try { r = await api("/api/agent", { question: s.q, use_llm: true }); }
+  finally { clearInterval(timer); }
+  stepEls.forEach(e => { e.classList.remove("active"); e.classList.add("done"); e.querySelector(".ag-step-node").textContent = "✓"; });
+  renderAgentInto($("#ag-answer"), r);
 }
 
 // ---- DATA SOURCE IDENTIFICATION -----------------------------------------
