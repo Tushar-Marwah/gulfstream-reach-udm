@@ -66,6 +66,12 @@ _CORE = [
      ["country", "origin", "location"], "free_text"),
     ("Supplier", "approval_status", "supplier", "enum", "", "Approved / conditional / disqualified",
      ["approval", "status", "qualified"], "free_text"),
+    ("Supplier", "reach_registered", "supplier", "enum", "", "REACH registration confirmed (yes/partial/no)",
+     ["reach", "registered", "registration"], "free_text"),
+    ("Supplier", "materials_supplied", "supplier", "string", "", "Material / product categories supplied",
+     ["materials", "supplied", "products", "categories"], "free_text"),
+    ("Supplier", "last_audit", "supplier", "string", "", "Last supplier audit (year-month)",
+     ["audit", "assessment", "reviewed"], "free_text"),
 
     # Part / assembly on an aircraft program
     ("Part", "part_number", "part", "string", "", "Engineering part number",

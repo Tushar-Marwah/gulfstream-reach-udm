@@ -13,77 +13,23 @@ from canonical import CANONICAL
 import rag
 import docs
 import catalog
-import companies
+import gsdata
 import plat
 
 SEED_DATE = "2026-06-20"
 
+# generate the comprehensive model once (deterministic) and reuse everywhere
+CHEMICALS = gsdata.chemicals()
+MATERIALS = gsdata.materials()
+_MAT_IDS = [m[0] for m in MATERIALS]
+PARTS = gsdata.parts(_MAT_IDS)
+PROGRAMS = gsdata.PROGRAMS
+SUPPLIERS = gsdata.suppliers()
+SDS_ROWS = gsdata.sds(MATERIALS)
+COMPLIANCE_ROWS = gsdata.compliance()
+
 # ---- aerospace substances (REACH-relevant) ----
 # (cas, name, ec, ghs_class, h_statements, reach_status, flash_c, oel_ppm, svhc, use)
-CHEMICALS = [
-    ("1333-82-0", "Chromium trioxide", "215-607-8", "Carc. 1A; Muta. 1B", "H350;H340;H317",
-     "Annex XIV (Authorisation)", "", "0.005", "yes", "chromate conversion / hard chrome"),
-    ("7789-06-2", "Strontium chromate", "232-142-6", "Carc. 1B", "H350;H373",
-     "SVHC (Candidate List)", "", "0.0005", "yes", "corrosion-inhibiting primer"),
-    ("7440-43-9", "Cadmium", "231-152-8", "Carc. 1B; Repr. 2", "H350;H341;H361",
-     "SVHC / RoHS restricted", "", "0.002", "yes", "sacrificial plating"),
-    ("302-01-2", "Hydrazine", "206-114-9", "Carc. 1B; Acute Tox. 2", "H350;H314;H317",
-     "SVHC (Candidate List)", "38", "0.01", "yes", "EPU emergency-power fuel"),
-    ("117-81-7", "Bis(2-ethylhexyl) phthalate (DEHP)", "204-211-0", "Repr. 1B", "H360",
-     "Annex XIV (Authorisation)", "", "", "yes", "plasticiser in sealants"),
-    ("79-01-6", "Trichloroethylene", "201-167-4", "Carc. 1B", "H350;H319",
-     "Annex XIV (Authorisation)", "", "10", "yes", "vapour degreasing"),
-    ("872-50-4", "N-Methyl-2-pyrrolidone (NMP)", "212-828-1", "Repr. 1B", "H360;H315",
-     "Annex XVII (Restriction)", "86", "10", "yes", "paint stripper / solvent"),
-    ("78-93-3", "Methyl ethyl ketone (MEK)", "201-159-0", "Flam. Liq. 2", "H225;H319;H336",
-     "Registered (compliant)", "-9", "200", "no", "solvent / cleaner"),
-    ("108-88-3", "Toluene", "203-625-9", "Flam. Liq. 2; Repr. 2", "H225;H361;H336",
-     "Annex XVII (Restriction)", "4", "50", "no", "solvent"),
-    ("822-06-0", "Hexamethylene diisocyanate (HDI)", "212-485-8", "Resp. Sens. 1", "H334;H317;H331",
-     "Registered (compliant)", "140", "0.005", "no", "polyurethane topcoat hardener"),
-    ("335-67-1", "Perfluorooctanoic acid (PFOA)", "206-397-9", "Carc. 2; Repr. 1B", "H350;H360;H372",
-     "Annex XVII / POP", "", "", "yes", "fluoropolymer processing"),
-    ("10043-35-3", "Boric acid", "233-139-2", "Repr. 1B", "H360", "SVHC (Candidate List)",
-     "", "", "yes", "anodising bath"),
-]
-
-# (material_id, name, spec, form, base_cas, supplier)
-MATERIALS = [
-    ("44GN098", "44GN098 epoxy corrosion-inhibiting primer", "MIL-PRF-23377", "liquid", "7789-06-2", "PPG Aerospace"),
-    ("A1200S", "Alodine 1200S chromate conversion coating", "MIL-DTL-5541", "liquid", "1333-82-0", "Chemetall"),
-    ("PR1440", "PR-1440 fuel-tank sealant", "AMS 3277", "paste", "117-81-7", "PPG Aerospace"),
-    ("EA9394", "EA 9394 structural epoxy adhesive", "AMS 3689", "paste", "", "Henkel"),
-    ("A3001", "Aerodur 3001 polyurethane topcoat", "AMS-C-83286", "liquid", "822-06-0", "AkzoNobel Aerospace Coatings"),
-    ("SKYLD4", "Skydrol LD-4 hydraulic fluid", "SAE AS1241", "liquid", "", "Eastman"),
-    ("M21", "HexPly M21 carbon-fibre prepreg", "BMS 8-276", "solid", "", "Hexcel"),
-    ("CADPL", "Cadmium electroplate", "AMS-QQ-P-416", "solid", "7440-43-9", "3M Aerospace"),
-    ("TCEDEG", "Trichloroethylene vapour degreaser", "O-T-634", "liquid", "79-01-6", "Eastman"),
-    ("STRIP7", "NMP-based paint stripper", "MIL-R-81294", "liquid", "872-50-4", "Chemetall"),
-    ("HYDEPU", "Hydrazine EPU fuel (H-70)", "MIL-PRF-27404", "liquid", "302-01-2", "Eastman"),
-]
-
-# (name, model, status)
-PROGRAMS = [
-    ("G700", "Ultra-long-range", "in production"), ("G800", "Ultra-long-range", "in development"),
-    ("G650ER", "Long-range", "in production"), ("G600", "Long-range", "in production"),
-    ("G500", "Long-range", "in production"), ("G280", "Super-mid-size", "in production"),
-]
-
-# (part_number, name, program, material_id)
-PARTS = [
-    ("W-5501-01", "Wing skin panel", "G700", "44GN098"),
-    ("F-2210-03", "Center-wing fuel tank", "G700", "PR1440"),
-    ("FS-1120", "Fuselage frame", "G800", "A1200S"),
-    ("LG-8830", "Main landing-gear strut", "G650ER", "CADPL"),
-    ("EP-7702", "Engine pylon fairing", "G600", "A3001"),
-    ("HYD-4410", "Flight-control hydraulic actuator", "G500", "SKYLD4"),
-    ("CS-9901", "Empennage composite skin", "G280", "M21"),
-    ("EPU-3300", "Emergency power unit", "G650ER", "HYDEPU"),
-    ("W-5502-07", "Wing spar", "G800", "44GN098"),
-    ("DR-1140", "Cabin door structure", "G600", "A1200S"),
-    ("EX-2201", "Exterior topcoat (fuselage)", "G700", "A3001"),
-    ("BR-3310", "Brake assembly plating", "G500", "CADPL"),
-]
 
 
 def _h(*parts):
@@ -109,18 +55,11 @@ def build_raw():
         "cols": ["material_id", "name", "spec", "form", "base_cas", "supplier"],
         "rows": [tuple(m) for m in MATERIALS]}
 
-    # one SDS per material
-    sds = []
-    for mid, name, spec, form, base, supp in MATERIALS:
-        rev = "%d-%02d-15" % (2024 + _h(mid) % 2, 1 + _h(mid, "m") % 12)
-        chem = next((c for c in CHEMICALS if c[0] == base), None)
-        hz = chem[3] if chem else "See Section 2"
-        sds.append(("SDS-%s" % mid, name, supp, rev, hz))
     raw["t_sds"] = {"label": "Safety Data Sheet library",
-                    "cols": ["sds_id", "product_name", "manufacturer", "revision_date", "hazards"], "rows": sds}
+                    "cols": ["sds_id", "product_name", "manufacturer", "revision_date", "hazards"], "rows": SDS_ROWS}
 
     raw["t_suppliers"] = {"label": "Supplier / manufacturer master",
-                          "cols": companies.COLS, "rows": companies.build_rows()}
+                          "cols": gsdata.SUPPLIER_COLS, "rows": SUPPLIERS}
 
     raw["t_parts"] = {"label": "Engineering parts → materials (BOM)",
                       "cols": ["part_number", "name", "program", "material"],
@@ -129,16 +68,9 @@ def build_raw():
     raw["t_programs"] = {"label": "Aircraft program master",
                          "cols": ["program", "model", "status"], "rows": [tuple(p) for p in PROGRAMS]}
 
-    # one compliance record per substance × REACH (+ RoHS where relevant)
-    comp = []
-    for cas, name, ec, ghs, h, status, fp, oel, svhc, use in CHEMICALS:
-        ref = ("Annex XIV" if "Annex XIV" in status else ("Annex XVII" if "Annex XVII" in status else "-"))
-        comp.append((cas, cas, "REACH", status, svhc, ref, _svhc_deadline(status, cas)))
-        if "RoHS" in status:
-            comp.append((cas, cas, "RoHS", "restricted (Pb/Cd)", "no", "Annex II", ""))
     raw["t_compliance"] = {"label": "Compliance status register",
                            "cols": ["subject", "cas", "regulation", "status", "svhc_flag", "restriction_ref", "deadline"],
-                           "rows": comp}
+                           "rows": COMPLIANCE_ROWS}
     return raw
 
 
@@ -183,6 +115,13 @@ BINDINGS = [
     ("Compliance.svhc_flag", "t_compliance", "svhc_flag", "-"),
     ("Compliance.restriction_ref", "t_compliance", "restriction_ref", "-"),
     ("Compliance.deadline", "t_compliance", "deadline", "-"),
+
+    ("Supplier.name", "t_suppliers", "supplier", "-"),
+    ("Supplier.country", "t_suppliers", "country", "-"),
+    ("Supplier.approval_status", "t_suppliers", "approval_status", "-"),
+    ("Supplier.reach_registered", "t_suppliers", "reach_registered", "-"),
+    ("Supplier.materials_supplied", "t_suppliers", "materials_supplied", "-"),
+    ("Supplier.last_audit", "t_suppliers", "last_audit", "-"),
 ]
 
 
@@ -267,7 +206,7 @@ def reset_all():
                     "VALUES (?,?,?,?,?)", reg)
     cur.executemany("INSERT INTO bindings (object_property, source_table, source_col, transform, "
                     "confidence, source_file, status) VALUES (?,?,?,?,1.0,'seed','approved')",
-                    BINDINGS + companies.BINDINGS)
+                    BINDINGS)
     cur.executemany("INSERT INTO edges (from_obj, from_key, link, to_obj, to_key) VALUES (?,?,?,?,?)",
                     _edges())
     conn.commit()
@@ -285,6 +224,35 @@ def reset_all():
                     ("Chemical.exposure_limit_ppm", "internal"), ("Material.supplier", "internal"),
                     ("ExposureScenario.measured_ppm", "restricted")]:
         cur.execute("INSERT OR IGNORE INTO classifications (object_property,level) VALUES (?,?)", (op, lvl))
+
+    # ---- authoritative governance: object ownership + role grants (sourced) ----
+    # (object, steward team, named data owner, workspace, sensitivity)
+    OWNERS = [
+        ("Chemical", "Environmental Compliance", "R. Alvarez (REACH Lead)", "Environmental Compliance", "confidential"),
+        ("Compliance", "Environmental Compliance", "R. Alvarez (REACH Lead)", "Environmental Compliance", "confidential"),
+        ("SafetyDataSheet", "EHS", "M. Chen (EHS Manager)", "Environmental Compliance", "internal"),
+        ("ExposureScenario", "EHS", "M. Chen (EHS Manager)", "Environmental Compliance", "restricted"),
+        ("Material", "Materials Engineering", "J. Okoro (Materials Eng. Lead)", "Materials Engineering", "internal"),
+        ("Part", "Materials Engineering", "J. Okoro (Materials Eng. Lead)", "Materials Engineering", "internal"),
+        ("Program", "Programme Management", "S. Whitfield (Programme Office)", "Global", "internal"),
+        ("Supplier", "Supply Chain", "L. Fischer (Supplier Quality)", "Global", "confidential"),
+    ]
+    cur.executemany("INSERT OR REPLACE INTO owners (object,steward,data_owner,workspace,sensitivity) "
+                    "VALUES (?,?,?,?,?)", OWNERS)
+    ROLE_PERMS = [
+        ("Admin", p) for p in ("read", "edit", "classify", "approve", "branch", "merge")
+    ] + [
+        ("Data Steward", p) for p in ("read", "edit", "approve", "branch")
+    ] + [
+        ("Compliance Officer", p) for p in ("read", "classify", "approve")
+    ] + [
+        ("Materials Engineer", p) for p in ("read", "edit", "branch")
+    ] + [
+        ("Analyst", p) for p in ("read", "branch")
+    ] + [
+        ("Viewer", "read"),
+    ]
+    cur.executemany("INSERT OR IGNORE INTO role_perms (role,perm) VALUES (?,?)", ROLE_PERMS)
     conn.commit()
     # demo write-back + a branch (as a Data Steward), then back to Admin/main
     plat.set_context(actor="Data Steward")
@@ -296,7 +264,7 @@ def reset_all():
     plat.set_context(actor="Admin", workspace="Global", branch="main")
 
     # document registry (SDSs + the raw sources)
-    all_binds = BINDINGS + companies.BINDINGS
+    all_binds = BINDINGS
     src_objects = {}
     for op, tbl, col, tf in all_binds:
         src_objects.setdefault(tbl, set()).add(op.split(".")[0])

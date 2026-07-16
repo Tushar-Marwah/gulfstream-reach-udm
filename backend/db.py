@@ -255,6 +255,11 @@ CREATE TABLE IF NOT EXISTS edits (
 CREATE TABLE IF NOT EXISTS history (
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, actor TEXT, role TEXT, workspace TEXT,
     branch TEXT, action TEXT, target TEXT, detail TEXT);
+-- authoritative object ownership / stewardship (governance, sourced not inferred)
+CREATE TABLE IF NOT EXISTS owners (
+    object TEXT PRIMARY KEY, steward TEXT, data_owner TEXT, workspace TEXT, sensitivity TEXT DEFAULT 'internal');
+-- authoritative role -> permission grants (access control, sourced not inferred)
+CREATE TABLE IF NOT EXISTS role_perms (role TEXT, perm TEXT, PRIMARY KEY (role, perm));
 """
 
 

@@ -45,9 +45,10 @@ MAGICA_BASE = os.environ.get("MAGICA_BASE", "https://api.magica.com/api/v1")
 MAGICA_KEY = os.environ.get("MAGICA_API_KEY", "")
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
-# Sonnet for high-volume extraction/mapping (cheap), Opus for the agent (sharp).
+# Sonnet 4.6 everywhere: near-Opus quality for governed-SQL planning + composition,
+# but 2-4x faster — the right trade for a live, seamless agent. Override via env if needed.
 EXTRACT_MODEL = os.environ.get("EXTRACT_MODEL", "claude_sonnet_4_6")
-AGENT_MODEL = os.environ.get("AGENT_MODEL", "claude_opus_4_8")
+AGENT_MODEL = os.environ.get("AGENT_MODEL", "claude_sonnet_4_6")
 # direct-Anthropic equivalents (only used if running without Magica)
 _ANTHROPIC_MAP = {
     "claude_sonnet_4_6": "claude-sonnet-4-6",

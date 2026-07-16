@@ -4,6 +4,7 @@ Flask API for the PEL Foundry demo + serves the browser front-end.
 Run:  python backend/app.py      (or ./run.sh)  ->  http://127.0.0.1:5050
 """
 import os
+import threading
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
 
@@ -413,19 +414,71 @@ def api_commit():
                                data.get("tail", []))
     finally:
         conn.close()
+    _AGENT_CACHE.clear()   # data changed → invalidate cached answers
     return jsonify(result)
 
 
-# ---- agent ---------------------------------------------------------------
+# ---- agent (with an answer cache so repeats + scenarios are instant) ------
+_AGENT_CACHE = {}
+
+
+def _agent_answer(question, use_llm):
+    key = (question.strip().lower(), bool(use_llm))
+    if key in _AGENT_CACHE:
+        out = dict(_AGENT_CACHE[key]); out["cached"] = True
+        return out
+    conn = get_conn()
+    try:
+        out = agent.answer(conn, question, use_llm=use_llm)
+    finally:
+        conn.close()
+    if use_llm and not out.get("llm_error"):
+        _AGENT_CACHE[key] = out
+    return out
+
+
 @app.route("/api/agent", methods=["POST"])
 def api_agent():
     data = request.get_json(force=True)
+    return jsonify(_agent_answer(data["question"], data.get("use_llm", False)))
+
+
+# ---- authoritative governance: ownership + role grants --------------------
+@app.route("/api/governance/ownership")
+def api_ownership():
     conn = get_conn()
-    try:
-        out = agent.answer(conn, data["question"], use_llm=data.get("use_llm", False))
-    finally:
-        conn.close()
-    return jsonify(out)
+    owners = {r["object"]: dict(r) for r in conn.execute("SELECT * FROM owners").fetchall()}
+    # coverage per object (properties + sources) from the ontology
+    reg = conn.execute("SELECT object, COUNT(*) n FROM object_registry WHERE status='approved' GROUP BY object").fetchall()
+    props = {r["object"]: r["n"] for r in reg}
+    srcs = {}
+    for r in conn.execute("SELECT object_property, source_file FROM bindings WHERE status='approved'").fetchall():
+        o = (r["object_property"] or ".").split(".")[0]
+        srcs.setdefault(o, set()).add(r["source_file"])
+    cls = {r["object_property"]: r["level"] for r in conn.execute("SELECT * FROM classifications").fetchall()}
+    conn.close()
+    out = []
+    for obj, o in owners.items():
+        out.append({"object": obj, "steward": o["steward"], "data_owner": o["data_owner"],
+                    "workspace": o["workspace"], "sensitivity": o["sensitivity"],
+                    "properties": props.get(obj, 0), "sources": len(srcs.get(obj, []))})
+    classified = [{"object_property": k, "level": v, "steward": owners.get(k.split(".")[0], {}).get("steward", "—")}
+                  for k, v in cls.items()]
+    return jsonify({"objects": sorted(out, key=lambda x: x["object"]), "classifications": classified})
+
+
+@app.route("/api/governance/roles")
+def api_roles():
+    conn = get_conn()
+    rows = conn.execute("SELECT role, perm FROM role_perms").fetchall()
+    conn.close()
+    roles = {}
+    for r in rows:
+        roles.setdefault(r["role"], []).append(r["perm"])
+    order = ["Admin", "Data Steward", "Compliance Officer", "Materials Engineer", "Analyst", "Viewer"]
+    out = [{"role": role, "perms": sorted(perms)} for role, perms in roles.items()]
+    out.sort(key=lambda x: order.index(x["role"]) if x["role"] in order else 99)
+    return jsonify({"roles": out, "all_perms": ["read", "edit", "classify", "approve", "branch", "merge"]})
 
 
 # ---- data source identification -----------------------------------------
@@ -492,12 +545,38 @@ def api_tpl_history():
 @app.route("/api/reset", methods=["POST"])
 def api_reset():
     seed.reset_all()
+    _AGENT_CACHE.clear()
+    _warm_async()
     return jsonify({"ok": True})
+
+
+# ---- background pre-warm: the starter questions answer instantly ----------
+_WARM = ["Which materials on the G700 contain a REACH SVHC, and which parts are affected?",
+         "What chrome-free alternatives to strontium chromate are qualified, and where are they used?",
+         "Trace where strontium chromate is used — from chemical to material to part to programme.",
+         "Which chemicals are on the REACH Authorisation List (Annex XIV), and what are their sunset dates?",
+         "Which suppliers are not confirmed REACH-registered, and what materials do they supply?",
+         "What are the exposure limits and hazard statements for the substances still in use?"]
+
+
+def _warm_async():
+    if not llm.available():
+        return
+
+    def warm(q):
+        try:
+            _agent_answer(q, True)
+        except Exception:  # noqa
+            pass
+    # warm all starters concurrently so the whole set is ready in ~one call's time
+    for q in _WARM:
+        threading.Thread(target=warm, args=(q,), daemon=True).start()
 
 
 if __name__ == "__main__":
     ensure_db()
+    _warm_async()
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "5050"))
-    print("PEL Foundry demo -> http://%s:%d" % (host, port))
+    print("Gulfstream REACH UDM -> http://%s:%d" % (host, port))
     app.run(host=host, port=port, debug=False)

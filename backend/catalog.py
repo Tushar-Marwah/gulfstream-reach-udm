@@ -12,7 +12,7 @@ def _h(*p):
 
 def build():
     from seed import CHEMICALS, MATERIALS, PARTS, PROGRAMS
-    from companies import SUPPLIERS
+    from gsdata import SUPPLIERS
     docs = []
 
     def add(fn, label, industry, scenario, use_case, entities, project, objects, kind="doc", ext="pdf"):

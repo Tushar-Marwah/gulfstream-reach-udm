@@ -694,23 +694,16 @@ async function loadGovFidelity() {
 }
 
 // ---- DATA GOVERNANCE · OWNERSHIP ----
-const OWNER_MAP = {
-  Chemical: "Environmental Compliance", Compliance: "Environmental Compliance",
-  ExposureScenario: "EHS", SafetyDataSheet: "EHS",
-  Material: "Materials Engineering", Part: "Materials Engineering",
-  Supplier: "Supply Chain", Program: "Programme Management",
-};
 const CLASS_BADGE = { restricted: "badge-tail", confidential: "badge-review", internal: "badge-soft", public: "badge-auto" };
 async function loadGovOwnership() {
-  const [cls, onto] = await Promise.all([api("/api/classifications"), api("/api/ontology")]);
-  const classifications = cls.classifications || {};
-  const objNames = Object.keys(onto.objects || {});
-  const clsRows = Object.entries(classifications).map(([op, lvl]) => ({ op, lvl }));
-  const restricted = clsRows.filter(r => r.lvl === "restricted" || r.lvl === "confidential").length;
+  const data = await api("/api/governance/ownership");
+  const objs = data.objects || [];
+  const clsRows = data.classifications || [];
+  const restricted = clsRows.filter(r => r.level === "restricted" || r.level === "confidential").length;
 
   _statRow($("#own-stats"), [
-    ["sc-purple", "◆", "Governed objects", objNames.length],
-    ["sc-blue", "◈", "Steward teams", new Set(objNames.map(o => OWNER_MAP[o] || "Data Office")).size],
+    ["sc-purple", "◆", "Governed objects", objs.length],
+    ["sc-blue", "◈", "Steward teams", new Set(objs.map(o => o.steward)).size],
     ["sc-orange", "⚿", "Classified fields", clsRows.length],
     ["sc-red", "⚠", "Restricted / confidential", restricted],
   ]);
@@ -724,42 +717,33 @@ async function loadGovOwnership() {
     const wrap = el("div", "table-wrap"), t = el("table");
     t.innerHTML = "<thead><tr><th>object.property</th><th>sensitivity</th><th>steward</th></tr></thead>";
     const tb = el("tbody");
-    clsRows.sort((a, b) => a.op.localeCompare(b.op)).forEach(r => {
-      const owner = OWNER_MAP[r.op.split(".")[0]] || "Data Office";
+    clsRows.sort((a, b) => a.object_property.localeCompare(b.object_property)).forEach(r => {
       tb.appendChild(el("tr", null,
-        `<td><b>${esc(r.op)}</b></td><td><span class="badge ${CLASS_BADGE[r.lvl] || "badge-soft"}">${esc(r.lvl)}</span></td><td>${esc(owner)}</td>`));
+        `<td><b>${esc(r.object_property)}</b></td><td><span class="badge ${CLASS_BADGE[r.level] || "badge-soft"}">${esc(r.level)}</span></td><td>${esc(r.steward)}</td>`));
     });
     t.appendChild(tb); wrap.appendChild(t); card.appendChild(wrap); ch.appendChild(card);
   }
 
-  // stewardship per object
-  const bound = {};
-  (onto.bindings || []).forEach(b => { const o = (b.object_property || ".").split(".")[0]; (bound[o] = bound[o] || new Set()).add(b.source_file); });
-  const rows = objNames.map(o => ({
-    "object": o, "steward": OWNER_MAP[o] || "Data Office",
-    "properties": (onto.objects[o] || []).length,
-    "sources": (bound[o] ? bound[o].size : 0),
-    "sensitivity": Object.keys(classifications).some(k => k.startsWith(o + ".") && ["restricted", "confidential"].includes(classifications[k])) ? "restricted" : "internal",
+  // stewardship per object (authoritative: steward + named data owner)
+  const rows = objs.map(o => ({
+    "object": o.object, "steward team": o.steward, "data owner": o.data_owner,
+    "workspace": o.workspace, "properties": o.properties, "sources": o.sources, "sensitivity": o.sensitivity,
   }));
   const oh = $("#own-objects"); oh.innerHTML = "";
   const card2 = el("div", "card");
-  card2.appendChild(el("div", "card-head", `<span class="name">object stewardship</span><span class="meta">${objNames.length} objects</span>`));
-  card2.appendChild(dataTable(["object", "steward", "properties", "sources", "sensitivity"], rows, 60));
+  card2.appendChild(el("div", "card-head", `<span class="name">object stewardship</span><span class="meta">${objs.length} objects · sourced from the governance registry</span>`));
+  card2.appendChild(dataTable(["object", "steward team", "data owner", "workspace", "properties", "sources", "sensitivity"], rows, 60));
   oh.appendChild(card2);
 }
 
 // ---- DATA GOVERNANCE · CONTROLS ----
-const ROLE_PERMS = {
-  Admin: ["read", "edit", "classify", "approve", "branch", "merge"],
-  Steward: ["read", "edit", "approve", "branch"],
-  Analyst: ["read", "branch"],
-  Viewer: ["read"],
-};
 async function loadGovControls() {
-  const [ctx, pend, hist] = await Promise.all([
+  const [rolesData, ctx, pend, hist] = await Promise.all([
+    api("/api/governance/roles"),
     api("/api/context"), api("/api/pending").catch(() => ({ pending: [] })), api("/api/history").catch(() => ({ history: [] })),
   ]);
-  const roles = ctx.roles || Object.keys(ROLE_PERMS);
+  const roles = rolesData.roles || [];
+  const perms = rolesData.all_perms || ["read", "edit", "classify", "approve", "branch", "merge"];
   const pending = pend.pending || [];
   const history = hist.history || [];
   _statRow($("#ctl-stats"), [
@@ -769,18 +753,16 @@ async function loadGovControls() {
     ["sc-purple", "▤", "Active workspace", esc(ctx.workspace || "Global")],
   ]);
 
-  // roles & permissions matrix
-  const perms = ["read", "edit", "classify", "approve", "branch", "merge"];
+  // roles & permissions matrix (authoritative, from role_perms grants)
   const rh = $("#ctl-roles"); rh.innerHTML = "";
   const card = el("div", "card");
-  card.appendChild(el("div", "card-head", `<span class="name">access &amp; roles</span><span class="meta">you are ${esc(ctx.actor || ctx.role || "—")}</span>`));
+  card.appendChild(el("div", "card-head", `<span class="name">access &amp; roles</span><span class="meta">${roles.length} roles · you are ${esc(ctx.actor || ctx.role || "—")}</span>`));
   const wrap = el("div", "table-wrap"), t = el("table");
   t.innerHTML = "<thead><tr><th>role</th>" + perms.map(p => `<th>${p}</th>`).join("") + "</tr></thead>";
   const tb = el("tbody");
-  roles.forEach(role => {
-    const rp = ROLE_PERMS[role] || ROLE_PERMS.Viewer;
-    tb.appendChild(el("tr", null, `<td><b>${esc(role)}</b></td>` +
-      perms.map(p => `<td>${rp.includes(p) ? '<span class="ctl-yes">●</span>' : '<span class="ctl-no">·</span>'}</td>`).join("")));
+  roles.forEach(r => {
+    tb.appendChild(el("tr", null, `<td><b>${esc(r.role)}</b></td>` +
+      perms.map(p => `<td>${r.perms.includes(p) ? '<span class="ctl-yes">●</span>' : '<span class="ctl-no">·</span>'}</td>`).join("")));
   });
   t.appendChild(tb); wrap.appendChild(t); card.appendChild(wrap); rh.appendChild(card);
 
