@@ -34,27 +34,23 @@
     <button class="tab" data-tab="raw">Uploaded Files</button>
   </div>
 
-  <button class="mod" data-mod="onto">Data Ontology<span class="caret">▾</span></button>
-  <div class="submod" id="mod-onto">
-    <button class="tab" data-tab="ontology">Meaning layer</button>
-    <button class="tab" data-tab="sources">Data source identification</button>
-    <button class="tab" data-tab="governance">Data governance setup</button>
-  </div>
-
   <button class="mod" data-mod="tpl">Data Templates<span class="caret">▾</span></button>
   <div class="submod" id="mod-tpl">
     <button class="tab" data-tab="tpl-dashboard">Dashboard</button>
     <button class="tab" data-tab="tpl-templates">Templates</button>
-    <button class="tab" data-tab="tpl-category">Data Category</button>
     <button class="tab" data-tab="tpl-query">Query tracking</button>
   </div>
 
-  <button class="tab tab-solo" data-tab="agent">✦ Agentic AI</button>
+  <button class="tab tab-solo" data-tab="agent">Agentic AI</button>
 
-  <button class="mod" data-mod="track">Tracking<span class="caret">▾</span></button>
-  <div class="submod" id="mod-track">
-    <button class="tab" data-tab="companies">Suppliers</button>
-    <button class="tab" data-tab="projects">Programs</button>
+  <button class="mod" data-mod="gov">Data Governance<span class="caret">▾</span></button>
+  <div class="submod" id="mod-gov">
+    <button class="tab" data-tab="governance">Quality assurance</button>
+    <button class="tab" data-tab="gov-fidelity">Data fidelity</button>
+    <button class="tab" data-tab="gov-ownership">Ownership</button>
+    <button class="tab" data-tab="gov-controls">Controls</button>
+    <button class="tab" data-tab="sources">Data source identification</button>
+    <button class="tab" data-tab="tpl-category">Data Category</button>
   </div>
 </aside>
 
@@ -480,24 +476,66 @@
 
   <!-- GOVERNANCE -->
   <section id="governance" class="panel">
-    <h2>Data governance setup — health, lineage &amp; readiness</h2>
-    <p class="muted">The Foundry-defining layer: don't just store the data — <b>govern</b> it. Score how complete
-      the model is against the PEL spec, run health checks over every value, and trace any number back through
-      its conversion and transform to the exact raw cell and source document it came from.</p>
+    <h2>Quality assurance — readiness &amp; health across the data lifecycle</h2>
+    <p class="muted">Don't just store the data — <b>assure</b> it. Coverage is scored against the canonical
+      specification, and automated checks validate every value continuously: completeness, conflicts,
+      out-of-range values and unmapped fields are surfaced, not hidden.</p>
 
-    <h3>Readiness by PEL level <span class="muted">— what the spec calls the readiness assessment</span></h3>
+    <div id="gov-qa-stats" class="stat-row"></div>
+
+    <h3>Readiness by level <span class="muted">— how much of the model is bound to real data</span></h3>
     <div id="readiness" class="card" style="padding:14px 18px"></div>
 
-    <h3>Data health <span class="muted">— validation over the unified model</span></h3>
+    <h3>Continuous health checks <span class="muted">— validation over the unified model</span></h3>
     <div id="health-summary" class="health-summary"></div>
     <div id="health-checks"></div>
+  </section>
 
-    <h3>Lineage explorer <span class="muted">— value → conversion → transform → raw cell → source</span></h3>
+  <!-- DATA GOVERNANCE: DATA FIDELITY -->
+  <section id="gov-fidelity" class="panel">
+    <h2>Data fidelity — every value traceable to its exact source</h2>
+    <p class="muted">Fidelity means an answer is the data, not an approximation of it. Here you can quantify how
+      faithfully the model reflects its sources, and trace any object property back through its transform and
+      conversion to the precise raw cell and originating document.</p>
+
+    <div id="fid-stats" class="stat-row"></div>
+
+    <h3>Binding fidelity <span class="muted">— direct reads vs. governed transforms, and confidence</span></h3>
+    <div id="fid-breakdown"></div>
+
+    <h3>Trace a value to source <span class="muted">— value → conversion → transform → raw cell → source</span></h3>
     <div class="lineage-pick">
       <select id="lin-obj"></select>
       <select id="lin-prop"></select>
     </div>
     <div id="lineage-view"></div>
+  </section>
+
+  <!-- DATA GOVERNANCE: OWNERSHIP -->
+  <section id="gov-ownership" class="panel">
+    <h2>Ownership — stewardship &amp; data classification</h2>
+    <p class="muted">Every object and property has a clear owner and a sensitivity classification. Ownership is
+      explicit, so accountability for accuracy and access is never ambiguous across the lifecycle.</p>
+    <div id="own-stats" class="stat-row"></div>
+    <h3>Data classification <span class="muted">— sensitivity applied per property, enforced on read</span></h3>
+    <div id="own-class"></div>
+    <h3>Object stewardship <span class="muted">— owner, workspace, coverage and sensitivity per object</span></h3>
+    <div id="own-objects"></div>
+  </section>
+
+  <!-- DATA GOVERNANCE: CONTROLS -->
+  <section id="gov-controls" class="panel">
+    <h2>Controls — access, approvals &amp; audit</h2>
+    <p class="muted">Change is governed end to end: access is role-based, mappings require approval before they go
+      live, and every action is written to an immutable audit trail — so who did what, when and why is always
+      provable.</p>
+    <div id="ctl-stats" class="stat-row"></div>
+    <h3>Access &amp; roles <span class="muted">— least-privilege, enforced by the platform</span></h3>
+    <div id="ctl-roles"></div>
+    <h3>Approval queue <span class="muted">— proposed mappings awaiting a steward's decision</span></h3>
+    <div id="ctl-approvals"></div>
+    <h3>Audit trail <span class="muted">— every governed action, attributed and time-stamped</span></h3>
+    <div id="ctl-audit"></div>
   </section>
 
   <!-- DOCUMENTS -->
@@ -534,8 +572,8 @@
     <h2>Data Upload — land → profile → map → commit</h2>
     <div id="ingest-stats" class="stat-row"></div>
     <p class="muted">Drop <b>any</b> file — CSV, Excel, JSON, PDF, Word, or an unstructured note. Spreadsheets
-      parse locally; PDFs and prose are read by Claude into rows. Then the LLM maps every column to the
-      full PEL spec (all 6 levels) — and proposes <b>new</b> objects/properties when something doesn't fit.</p>
+      parse locally; PDFs and prose are read into rows by the model. Every column is then mapped to the
+      canonical ontology — and <b>new</b> objects/properties are proposed when something doesn't fit.</p>
 
     <div class="proj-grid">
       <div>
@@ -568,14 +606,14 @@
           resolves it from the systems of record, weaves in documentation, and answers with citations you can open —
           it never touches a raw table directly, only governed objects.</p>
       </div>
-      <div class="aip-status"><span class="ag-dot"></span> Ontology-grounded <span class="aip-status-sep">·</span> <span id="aip-model">Opus</span></div>
+      <div class="aip-status"><span class="ag-dot"></span> Ontology-grounded <span class="aip-status-sep">·</span> secure &amp; cited</div>
     </div>
     <div id="aip-thread" class="aip-thread"></div>
     <div class="aip-composer">
       <div id="aip-suggest" class="aip-suggest"></div>
       <div class="aip-input-row">
         <textarea id="aip-input" rows="1" placeholder="Ask across chemicals, materials, parts, suppliers, compliance…"></textarea>
-        <button id="aip-send" class="aip-send" title="Send">➤</button>
+        <button id="aip-send" class="aip-send" title="Send">Send</button>
       </div>
       <div class="aip-hint">Every answer is planned, resolved from source, and cited — expand any step to see the exact query and rows.</div>
     </div>
@@ -623,8 +661,9 @@
   <!-- DATA ONTOLOGY: data source identification -->
   <section id="sources" class="panel">
     <h2>Data source identification</h2>
-    <p class="muted">Every raw source connected to the model, and the business objects it feeds — so you can see
-      where each fact originates.</p>
+    <p class="muted">Every raw source connected to the model and the business objects it feeds. <b>Click any source
+      to explode it</b> — down to its columns, the exact bindings it drives, per-property confidence, and a live
+      sample of the raw records.</p>
     <div id="sources-list"></div>
   </section>
 

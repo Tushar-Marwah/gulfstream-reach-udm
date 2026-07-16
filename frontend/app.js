@@ -123,6 +123,7 @@ const loaders = {
   sources: loadSources,
   "tpl-dashboard": loadTplDashboard, "tpl-templates": loadTemplates,
   "tpl-category": loadTplCategory, "tpl-query": loadTplQuery,
+  "gov-fidelity": loadGovFidelity, "gov-ownership": loadGovOwnership, "gov-controls": loadGovControls,
 };
 loaders.agent = loadAgentic;
 
@@ -504,6 +505,16 @@ async function loadIngestStats() {
 
 // ---- GOVERNANCE ----------------------------------------------------------
 const SEV_BADGE = { ok: "badge-auto", warn: "badge-review", fail: "badge-tail" };
+function _statRow(host, cards) {
+  if (!host) return;
+  host.innerHTML = "";
+  cards.forEach(([cls, ic, lbl, num]) => {
+    const c = el("div", "stat-card " + cls);
+    c.innerHTML = `<div class="icon">${ic}</div><div><div class="lbl">${lbl}</div><div class="num">${num}</div></div>`;
+    host.appendChild(c);
+  });
+}
+
 async function loadGovernance() {
   // readiness
   const rd = await api("/api/readiness");
@@ -540,19 +551,169 @@ async function loadGovernance() {
   });
   t.appendChild(tb); wrap.appendChild(t); card.appendChild(wrap); hc.appendChild(card);
 
-  // lineage selectors
+  _statRow($("#gov-qa-stats"), [
+    ["sc-teal", "◎", "Overall coverage", rd.overall_pct + "%"],
+    ["sc-green", "✓", "Checks passing", h.summary.ok],
+    ["sc-orange", "!", "Warnings", h.summary.warn],
+    ["sc-blue", "▦", "Bound properties", rd.bound + "/" + rd.total],
+  ]);
+}
+
+// ---- DATA GOVERNANCE · DATA FIDELITY ----
+async function loadGovFidelity() {
+  const onto = await api("/api/ontology");
+  const binds = (onto.bindings || []).filter(b => b.status === "approved");
+  const direct = binds.filter(b => !b.transform || b.transform === "-").length;
+  const transformed = binds.length - direct;
+  const confs = binds.map(b => +b.confidence || 0);
+  const avgConf = confs.length ? confs.reduce((a, c) => a + c, 0) / confs.length : 0;
+  _statRow($("#fid-stats"), [
+    ["sc-teal", "◈", "Governed pointers", binds.length],
+    ["sc-green", "↳", "Direct reads", direct],
+    ["sc-orange", "⚙", "Transformed", transformed],
+    ["sc-blue", "◎", "Avg confidence", avgConf.toFixed(2)],
+  ]);
+
+  // per-object fidelity breakdown
+  const byObj = {};
+  binds.forEach(b => {
+    const o = (b.object_property || ".").split(".")[0];
+    const d = byObj[o] || (byObj[o] = { obj: o, n: 0, direct: 0, conf: 0, sources: new Set() });
+    d.n++; if (!b.transform || b.transform === "-") d.direct++;
+    d.conf += (+b.confidence || 0); d.sources.add(b.source_file);
+  });
+  const rows = Object.values(byObj).sort((a, b) => b.n - a.n).map(d => ({
+    "object": d.obj, "pointers": d.n, "direct": d.direct,
+    "transformed": d.n - d.direct, "sources": d.sources.size,
+    "avg confidence": (d.conf / d.n).toFixed(2),
+  }));
+  const bd = $("#fid-breakdown"); bd.innerHTML = "";
+  const card = el("div", "card");
+  card.appendChild(el("div", "card-head", `<span class="name">fidelity by object</span><span class="meta">${binds.length} pointers</span>`));
+  card.appendChild(dataTable(["object", "pointers", "direct", "transformed", "sources", "avg confidence"], rows, 60));
+  bd.appendChild(card);
+
+  // trace-a-value selectors
   const data = await api("/api/governance/objects");
-  const objSel = $("#lin-obj"), propSel = $("#lin-prop");
+  const objSel = $("#lin-obj"), propSel = $("#lin-prop"); if (!objSel) return;
   const objs = data.objects;
   objSel.innerHTML = Object.keys(objs).map(o => `<option>${esc(o)}</option>`).join("");
-  function fillProps() {
-    const o = objSel.value;
-    propSel.innerHTML = (objs[o] || []).map(p => `<option>${esc(p)}</option>`).join("");
-  }
+  const fillProps = () => { propSel.innerHTML = (objs[objSel.value] || []).map(p => `<option>${esc(p)}</option>`).join(""); };
   objSel.onchange = () => { fillProps(); loadLineage(); };
   propSel.onchange = loadLineage;
   fillProps();
   loadLineage();
+}
+
+// ---- DATA GOVERNANCE · OWNERSHIP ----
+const OWNER_MAP = {
+  Chemical: "Environmental Compliance", Compliance: "Environmental Compliance",
+  ExposureScenario: "EHS", SafetyDataSheet: "EHS",
+  Material: "Materials Engineering", Part: "Materials Engineering",
+  Supplier: "Supply Chain", Program: "Programme Management",
+};
+const CLASS_BADGE = { restricted: "badge-tail", confidential: "badge-review", internal: "badge-soft", public: "badge-auto" };
+async function loadGovOwnership() {
+  const [cls, onto] = await Promise.all([api("/api/classifications"), api("/api/ontology")]);
+  const classifications = cls.classifications || {};
+  const objNames = Object.keys(onto.objects || {});
+  const clsRows = Object.entries(classifications).map(([op, lvl]) => ({ op, lvl }));
+  const restricted = clsRows.filter(r => r.lvl === "restricted" || r.lvl === "confidential").length;
+
+  _statRow($("#own-stats"), [
+    ["sc-purple", "◆", "Governed objects", objNames.length],
+    ["sc-blue", "◈", "Steward teams", new Set(objNames.map(o => OWNER_MAP[o] || "Data Office")).size],
+    ["sc-orange", "⚿", "Classified fields", clsRows.length],
+    ["sc-red", "⚠", "Restricted / confidential", restricted],
+  ]);
+
+  // classification table
+  const ch = $("#own-class"); ch.innerHTML = "";
+  if (!clsRows.length) ch.appendChild(el("div", "empty", "No fields are restricted — all properties are public."));
+  else {
+    const card = el("div", "card");
+    card.appendChild(el("div", "card-head", `<span class="name">data classification</span><span class="meta">${clsRows.length} classified fields</span>`));
+    const wrap = el("div", "table-wrap"), t = el("table");
+    t.innerHTML = "<thead><tr><th>object.property</th><th>sensitivity</th><th>steward</th></tr></thead>";
+    const tb = el("tbody");
+    clsRows.sort((a, b) => a.op.localeCompare(b.op)).forEach(r => {
+      const owner = OWNER_MAP[r.op.split(".")[0]] || "Data Office";
+      tb.appendChild(el("tr", null,
+        `<td><b>${esc(r.op)}</b></td><td><span class="badge ${CLASS_BADGE[r.lvl] || "badge-soft"}">${esc(r.lvl)}</span></td><td>${esc(owner)}</td>`));
+    });
+    t.appendChild(tb); wrap.appendChild(t); card.appendChild(wrap); ch.appendChild(card);
+  }
+
+  // stewardship per object
+  const bound = {};
+  (onto.bindings || []).forEach(b => { const o = (b.object_property || ".").split(".")[0]; (bound[o] = bound[o] || new Set()).add(b.source_file); });
+  const rows = objNames.map(o => ({
+    "object": o, "steward": OWNER_MAP[o] || "Data Office",
+    "properties": (onto.objects[o] || []).length,
+    "sources": (bound[o] ? bound[o].size : 0),
+    "sensitivity": Object.keys(classifications).some(k => k.startsWith(o + ".") && ["restricted", "confidential"].includes(classifications[k])) ? "restricted" : "internal",
+  }));
+  const oh = $("#own-objects"); oh.innerHTML = "";
+  const card2 = el("div", "card");
+  card2.appendChild(el("div", "card-head", `<span class="name">object stewardship</span><span class="meta">${objNames.length} objects</span>`));
+  card2.appendChild(dataTable(["object", "steward", "properties", "sources", "sensitivity"], rows, 60));
+  oh.appendChild(card2);
+}
+
+// ---- DATA GOVERNANCE · CONTROLS ----
+const ROLE_PERMS = {
+  Admin: ["read", "edit", "classify", "approve", "branch", "merge"],
+  Steward: ["read", "edit", "approve", "branch"],
+  Analyst: ["read", "branch"],
+  Viewer: ["read"],
+};
+async function loadGovControls() {
+  const [ctx, pend, hist] = await Promise.all([
+    api("/api/context"), api("/api/pending").catch(() => ({ pending: [] })), api("/api/history").catch(() => ({ history: [] })),
+  ]);
+  const roles = ctx.roles || Object.keys(ROLE_PERMS);
+  const pending = pend.pending || [];
+  const history = hist.history || [];
+  _statRow($("#ctl-stats"), [
+    ["sc-blue", "◇", "Roles", roles.length],
+    ["sc-orange", "⏳", "Awaiting approval", pending.length],
+    ["sc-green", "✓", "Audited actions", history.length],
+    ["sc-purple", "▤", "Active workspace", esc(ctx.workspace || "Global")],
+  ]);
+
+  // roles & permissions matrix
+  const perms = ["read", "edit", "classify", "approve", "branch", "merge"];
+  const rh = $("#ctl-roles"); rh.innerHTML = "";
+  const card = el("div", "card");
+  card.appendChild(el("div", "card-head", `<span class="name">access &amp; roles</span><span class="meta">you are ${esc(ctx.actor || ctx.role || "—")}</span>`));
+  const wrap = el("div", "table-wrap"), t = el("table");
+  t.innerHTML = "<thead><tr><th>role</th>" + perms.map(p => `<th>${p}</th>`).join("") + "</tr></thead>";
+  const tb = el("tbody");
+  roles.forEach(role => {
+    const rp = ROLE_PERMS[role] || ROLE_PERMS.Viewer;
+    tb.appendChild(el("tr", null, `<td><b>${esc(role)}</b></td>` +
+      perms.map(p => `<td>${rp.includes(p) ? '<span class="ctl-yes">●</span>' : '<span class="ctl-no">·</span>'}</td>`).join("")));
+  });
+  t.appendChild(tb); wrap.appendChild(t); card.appendChild(wrap); rh.appendChild(card);
+
+  // approval queue
+  const ah = $("#ctl-approvals"); ah.innerHTML = "";
+  if (!pending.length) ah.appendChild(el("div", "empty", "Nothing pending — every mapping is approved."));
+  else {
+    const rows = pending.map(b => ({ "object.property": b.object_property, "reads": `${b.source_table}.${b.source_col}`, "confidence": b.confidence, "from file": b.source_file }));
+    const c = el("div", "card");
+    c.appendChild(el("div", "card-head", `<span class="name">approval queue</span><span class="meta">${pending.length} proposed</span>`));
+    c.appendChild(dataTable(["object.property", "reads", "confidence", "from file"], rows, 60));
+    ah.appendChild(c);
+  }
+
+  // audit trail
+  const dh = $("#ctl-audit"); dh.innerHTML = "";
+  const rows = history.map(x => ({ time: x.ts, actor: x.actor, role: x.role, action: x.action, target: x.target, detail: x.detail }));
+  const c2 = el("div", "card");
+  c2.appendChild(el("div", "card-head", `<span class="name">audit trail</span><span class="meta">${history.length} events</span>`));
+  c2.appendChild(dataTable(["time", "actor", "role", "action", "target", "detail"], rows, 200));
+  dh.appendChild(c2);
 }
 
 async function loadLineage() {
@@ -889,7 +1050,6 @@ function loadAgentic() {
         c.addEventListener("click", () => aipSend(q));
         host.appendChild(c);
       });
-      if (m.llm && m.llm.agent_model) $("#aip-model").textContent = m.llm.agent_model.replace(/_/g, " ");
     });
   }
 }
@@ -898,15 +1058,13 @@ function aipEmptyState() {
   const thread = $("#aip-thread");
   const wrap = el("div", "aip-empty");
   wrap.innerHTML = `
-    <div class="aip-empty-mark">✦</div>
     <div class="aip-empty-title">Ask the ontology anything</div>
     <div class="aip-empty-sub">Chemicals, materials, parts, suppliers and compliance — one agent that plans,
       resolves from the systems of record, and cites its work. Start from a capability or type a question below.</div>`;
   const grid = el("div", "aip-starters");
   AIP_STARTERS.forEach(s => {
     const c = el("button", "aip-starter");
-    c.innerHTML = `<span class="aip-starter-ic">${s.icon}</span>
-      <span class="aip-starter-tag">${esc(s.tag)}</span>
+    c.innerHTML = `<span class="aip-starter-tag">${esc(s.tag)}</span>
       <span class="aip-starter-q">${esc(s.q)}</span>`;
     c.addEventListener("click", () => aipSend(s.q));
     grid.appendChild(c);
@@ -929,7 +1087,7 @@ async function aipSend(q) {
   thread.appendChild(uturn);
 
   const aturn = el("div", "aip-turn agent");
-  aturn.innerHTML = `<div class="aip-avatar">✦</div><div class="aip-body"></div>`;
+  aturn.innerHTML = `<div class="aip-body"></div>`;
   const body = aturn.querySelector(".aip-body");
   thread.appendChild(aturn);
   aipScroll(uturn);
@@ -940,7 +1098,7 @@ async function aipSend(q) {
   const renderWork = () => {
     workEl.innerHTML = AIP_PHASES.map((ph, i) => {
       const st = i < p ? "done" : i === p ? "active" : "idle";
-      const ic = st === "done" ? "✓" : st === "active" ? '<span class="aip-mini-spin"></span>' : "";
+      const ic = st === "active" ? '<span class="aip-mini-spin"></span>' : "";
       return `<div class="aip-work-item ${st}"><span class="aip-work-ic">${ic}</span><span>${ph}</span></div>`;
     }).join("");
   };
@@ -1017,24 +1175,73 @@ function aipRenderResult(body, r) {
   body.appendChild(ans);
 }
 
-// ---- DATA SOURCE IDENTIFICATION -----------------------------------------
+// ---- DATA SOURCE IDENTIFICATION (click to explode) ----------------------
+let _srcOnto = null;
 async function loadSources() {
   const host = $("#sources-list"); host.innerHTML = '<div class="spinner">Loading…</div>';
-  const data = await api("/api/sources");
+  const [data, onto] = await Promise.all([api("/api/sources"), api("/api/ontology")]);
+  _srcOnto = onto;
   host.innerHTML = "";
   host.appendChild(el("div", "muted",
-    `${data.sources.length} connected source table(s) feeding the model.`));
+    `${data.sources.length} connected source table(s) feeding the model — click any row to explode it to columns, bindings and raw records.`));
   const card = el("div", "card"); card.style.marginTop = "10px";
-  const rows = data.sources.map(s => ({
-    "source table": s.source_table,
-    "from file": s.source_file,
-    "feeds objects": s.objects.join(", ") || "—",
-    "properties": s.properties,
-    "approved": s.approved,
+  const wrap = el("div", "table-wrap"), t = el("table");
+  t.innerHTML = "<thead><tr><th>source table</th><th>from file</th><th>feeds objects</th><th>properties</th><th>approved</th><th></th></tr></thead>";
+  const tb = el("tbody");
+  data.sources.forEach(s => {
+    const tr = el("tr"); tr.style.cursor = "pointer";
+    tr.innerHTML = `<td><b>${esc(s.source_table)}</b></td><td>${esc(s.source_file)}</td>
+      <td>${esc(s.objects.join(", ") || "—")}</td><td>${s.properties}</td><td>${s.approved}</td>
+      <td style="color:var(--blue);text-align:right">explode →</td>`;
+    tr.addEventListener("click", () => openSourceDrawer(s));
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); wrap.appendChild(t); card.appendChild(wrap); host.appendChild(card);
+}
+
+async function openSourceDrawer(s) {
+  const node = el("div"); node.innerHTML = '<div class="spinner">Exploding source…</div>';
+  openDrawer("Source · " + esc(s.source_table), node);
+  const binds = (_srcOnto && _srcOnto.bindings || []).filter(b => b.source_table === s.source_table);
+  let raw = { columns: [], rows: [] };
+  try { raw = await api("/api/raw/table?name=" + encodeURIComponent(s.source_table)); } catch (e) { /* seed/no table */ }
+  node.innerHTML = "";
+  node.appendChild(el("div", "interp",
+    `<b>${esc(s.source_table)}</b> — landed from <b>${esc(s.source_file)}</b>. Feeds <b>${esc(s.objects.join(", ") || "—")}</b> ·
+     ${s.properties} bound propert${s.properties === 1 ? "y" : "ies"} · ${s.approved} approved · ${raw.columns.length} columns · ${raw.rows.length} sample rows.`));
+
+  // per-column: which object.property it drives
+  if (raw.columns.length) {
+    const colMap = {};
+    binds.forEach(b => (colMap[b.source_col] = colMap[b.source_col] || []).push(b.object_property));
+    const cols = raw.columns.map(c => ({
+      "column": c, "drives": (colMap[c] || []).join(", ") || "— (unmapped)",
+      "mapped": colMap[c] ? "yes" : "no",
+    }));
+    const ccard = el("div", "card"); ccard.style.marginTop = "12px";
+    ccard.appendChild(el("div", "card-head", `<span class="name">columns → objects</span><span class="meta">${raw.columns.length} columns</span>`));
+    ccard.appendChild(dataTable(["column", "drives", "mapped"], cols, 60));
+    node.appendChild(ccard);
+  }
+
+  // bindings driven by this source (transform + confidence, granular)
+  const bcard = el("div", "card"); bcard.style.marginTop = "12px";
+  bcard.appendChild(el("div", "card-head", `<span class="name">bindings driven</span><span class="meta">${binds.length}</span>`));
+  const brows = binds.map(b => ({
+    "object.property": b.object_property, "← column": b.source_col,
+    "transform": (!b.transform || b.transform === "-") ? "—" : b.transform + (b.factor && b.factor !== 1 ? ` ×${b.factor}` : ""),
+    "source unit": b.source_unit || "—", "confidence": b.confidence, "status": b.status,
   }));
-  card.appendChild(dataTable(
-    ["source table", "from file", "feeds objects", "properties", "approved"], rows, 300));
-  host.appendChild(card);
+  bcard.appendChild(dataTable(["object.property", "← column", "transform", "source unit", "confidence", "status"], brows, 100));
+  node.appendChild(bcard);
+
+  // live raw sample
+  if (raw.columns.length) {
+    const rcard = el("div", "card"); rcard.style.marginTop = "12px";
+    rcard.appendChild(el("div", "card-head", `<span class="name">${esc(s.source_table)}</span><span class="meta">raw records, stored exactly as ingested</span>`));
+    rcard.appendChild(dataTable(raw.columns, raw.rows, 100));
+    node.appendChild(rcard);
+  }
 }
 
 // ---- DATA TEMPLATES ------------------------------------------------------
@@ -1213,9 +1420,9 @@ if (_resetBtn) _resetBtn.addEventListener("click", async () => {
   try {
     const m = await api("/api/meta");
     $("#mode-badge").textContent = m.llm_available
-      ? `${m.llm.backend} · ${m.llm.extract_model}`
-      : "offline · structured files only";
-  } catch (e) { $("#mode-badge").textContent = "backend offline"; }
+      ? "Online · secure & grounded"
+      : "Offline · structured files only";
+  } catch (e) { $("#mode-badge").textContent = "Reconnecting…"; }
 })();
 initContext();
 

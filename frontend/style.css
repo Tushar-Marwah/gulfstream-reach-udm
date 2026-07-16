@@ -661,3 +661,12 @@ tbody tr:hover { background: #0e141d; }
   display: flex; align-items: center; justify-content: center; transition: filter .15s; }
 .aip-send:hover { filter: brightness(1.12); }
 .aip-hint { font-size: 11px; color: #5d6b7e; margin-top: 9px; text-align: center; }
+
+/* governance controls matrix + agentic tweaks (icon-free) */
+.ctl-yes { color: var(--green); font-size: 12px; }
+.ctl-no { color: #3a4453; }
+.aip-send { width: auto; padding: 0 16px; font-size: 13px; font-weight: 600; }
+.aip-work-item.done .aip-work-ic::before { content: ""; display: block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--green); }
+.aip-work-ic { display: flex; align-items: center; justify-content: center; }
+.aip-turn.agent .aip-body { padding-left: 2px; border-left: 2px solid var(--border); padding-left: 15px; }
