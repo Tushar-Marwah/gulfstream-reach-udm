@@ -586,20 +586,6 @@ let dzWired = false;
 async function loadIncoming() {
   loadIngestStats();
   wireDropzone();
-  const host = $("#incoming-files"); host.innerHTML = '<div class="spinner">Loading…</div>';
-  const data = await api("/api/incoming");
-  host.innerHTML = "";
-  data.files.forEach(f => {
-    const card = el("div", "file-card");
-    const meta = f.row_count != null ? `${f.row_count} rows` : "Claude extracts the rows";
-    card.innerHTML = `<div class="fn">${esc(f.file)} <span class="badge badge-soft">${esc(f.type)}</span></div>
-      <div class="fl">${esc(f.label)} · ${meta}</div>
-      ${f.headers && f.headers.length ? `<div class="cols">${f.headers.map(esc).join(" · ")}</div>` : ""}`;
-    const btn = el("button", "btn btn-primary", "Land &amp; profile");
-    btn.addEventListener("click", () => profileFile(f.file));
-    card.appendChild(btn);
-    host.appendChild(card);
-  });
 }
 
 function wireDropzone() {
