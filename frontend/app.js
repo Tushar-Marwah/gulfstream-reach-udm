@@ -866,7 +866,51 @@ async function ask() {
   renderAgent(r);
 }
 
-function renderAgent(r) { renderAgentInto($("#agent-result"), r); }
+function renderAgent(r) {
+  renderAgentInto($("#agent-result"), r);
+  agFollowups($("#agent-result"), q => { $("#question").value = q; ask(); });
+}
+
+// ---- follow-up section (ported from the agentic UI: deep-dive chips + input) ----
+const AG_FOLLOWUPS = [
+  "Which programmes are most exposed to Annex XIV sunset dates?",
+  "What chrome-free alternatives are already qualified?",
+  "Which suppliers still need REACH registration follow-up?",
+  "Summarise the exposure limits for the substances still in use.",
+  "Which parts would a cadmium restriction impact first?",
+  "Where is hexavalent chromium still specified, and why?",
+];
+let _fupIdx = 0;
+function agFollowups(host, ask) {
+  const pool = AG_FOLLOWUPS.concat(AG_FOLLOWUPS).slice(_fupIdx % AG_FOLLOWUPS.length, (_fupIdx % AG_FOLLOWUPS.length) + 3);
+  _fupIdx += 3;
+  const sec = el("div", "ag-followup");
+  sec.appendChild(el("span", "ag-section-title", "Suggested deep dives"));
+  const chips = el("div", "ag-followup-chips");
+  pool.forEach(q => {
+    const c = el("button", "ag-followup-chip", "✦ " + esc(q));
+    c.addEventListener("click", () => ask(q));
+    chips.appendChild(c);
+  });
+  sec.appendChild(chips);
+  const wrap = el("div", "ag-followup-input-wrap");
+  const inp = el("input", "ag-followup-input"); inp.placeholder = "Ask a follow-up…";
+  const btn = el("button", "ag-send-btn", "➤");
+  const go = () => { const v = inp.value.trim(); if (v) ask(v); };
+  btn.addEventListener("click", go);
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+  wrap.appendChild(inp); wrap.appendChild(btn);
+  sec.appendChild(wrap);
+  host.appendChild(sec);
+}
+
+async function askGuided(q) {
+  const answer = $("#ag-answer"); if (!answer) return;
+  answer.innerHTML = '<div class="spinner">Thinking…</div>';
+  const r = await api("/api/agent", { question: q, use_llm: true });
+  renderAgentInto(answer, r);
+  agFollowups(answer, askGuided);
+}
 
 function renderAgentInto(host, r) {
   host.innerHTML = "";
@@ -898,7 +942,8 @@ function renderAgentInto(host, r) {
   });
 
   const ans = el("div", "answer");
-  ans.innerHTML = `<div class="lbl">Agent answer</div>${esc(r.answer)}`;
+  const conf = r.mode === "llm" ? "High confidence" : "Heuristic";
+  ans.innerHTML = `<div class="lbl">Agent answer <span class="ag-conf"><span class="dot"></span>${conf}</span></div>${esc(r.answer)}`;
   if (r.sources && r.sources.length)
     ans.appendChild(el("div", "sources", `<b>Grounded in:</b> ${r.sources.map(esc).join(", ")}`));
   if (r.cost_usd)
@@ -991,19 +1036,24 @@ async function runScenario(s) {
   const host = $("#ag-steps");
   s.steps.forEach((st, i) => host.appendChild(
     el("div", "ag-step", `<span class="ag-step-node">${i + 1}</span><span class="ag-step-text">${esc(st)}</span>`)));
+  $("#ag-answer").innerHTML = '<div class="ag-synth"><span class="ag-synth-spin"></span>Resolving the ontology and composing a cited answer…</div>';
   const stepEls = $$(".ag-step", host);
-  let i = 0;
+  let i = 0, timer;
   const advance = () => {
-    if (i > 0) { const p = stepEls[i - 1]; p.classList.remove("active"); p.classList.add("done"); p.querySelector(".ag-step-node").textContent = "✓"; }
+    // complete each step, but keep the LAST one 'active' (thinking) until the answer lands
+    if (i > 0 && i < stepEls.length) { const p = stepEls[i - 1]; p.classList.remove("active"); p.classList.add("done"); p.querySelector(".ag-step-node").textContent = "✓"; }
     if (i < stepEls.length) { stepEls[i].classList.add("active"); i++; }
+    if (i >= stepEls.length) clearInterval(timer);
   };
   advance();
-  const timer = setInterval(advance, 750);
+  timer = setInterval(advance, 1100);
   let r;
   try { r = await api("/api/agent", { question: s.q, use_llm: true }); }
   finally { clearInterval(timer); }
   stepEls.forEach(e => { e.classList.remove("active"); e.classList.add("done"); e.querySelector(".ag-step-node").textContent = "✓"; });
-  renderAgentInto($("#ag-answer"), r);
+  const answer = $("#ag-answer");
+  renderAgentInto(answer, r);
+  agFollowups(answer, askGuided);
 }
 
 // ---- DATA SOURCE IDENTIFICATION -----------------------------------------
