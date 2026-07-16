@@ -1278,11 +1278,29 @@ initOverviewDemo();
 function initReveal() {
   const els = [...document.querySelectorAll(".reveal")];
   if (!els.length) return;
-  if (!("IntersectionObserver" in window)) { els.forEach(e => e.classList.add("in")); return; }
+  const show = (e) => e.classList.add("in");
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce || !("IntersectionObserver" in window)) { els.forEach(show); return; }
   const io = new IntersectionObserver((ents) => {
-    ents.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+    ents.forEach(e => { if (e.isIntersecting) { show(e.target); io.unobserve(e.target); } });
   }, { threshold: 0.12 });
   els.forEach(e => io.observe(e));
+  // belt-and-suspenders: some embedded / background-throttled contexts never deliver
+  // IntersectionObserver callbacks — reveal-on-scroll manually so the same fade-in still
+  // plays and content is never left stuck at opacity:0.
+  const sweep = () => {
+    const vh = window.innerHeight || 800;
+    els.forEach(e => {
+      if (e.classList.contains("in")) return;
+      const r = e.getBoundingClientRect();
+      if (r.top < vh * 0.92 && r.bottom > 0) { show(e); io.unobserve(e); }
+    });
+  };
+  window.addEventListener("scroll", sweep, { passive: true });
+  window.addEventListener("resize", sweep, { passive: true });
+  sweep();
+  // final safety net: if nothing ever revealed, show everything after a moment
+  setTimeout(() => { if (!document.querySelector(".reveal.in")) els.forEach(show); }, 2500);
 }
 initReveal();
 
