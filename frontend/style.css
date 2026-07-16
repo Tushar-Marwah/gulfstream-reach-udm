@@ -135,7 +135,7 @@ code { font-family: var(--mono); background: #0c1320; padding: 1px 6px; border-r
 .flow-svg .fm { fill: #8896a8; font-size: 10px; text-anchor: middle; font-family: var(--mono); }
 .flow-svg .fp { fill: #cdd7e3; font-size: 12px; font-family: var(--mono); }
 .flow-svg .fpv { fill: #8896a8; font-size: 11px; font-family: var(--mono); }
-.flow-svg .edge { stroke: #4a5a70; stroke-width: 1.6; fill: none; }
+.flow-svg .edge { stroke: #5a6b82; stroke-width: 1.6; fill: none; }
 .flow-svg .elabel { fill: var(--amber); font-size: 10.5px; text-anchor: middle; font-family: var(--mono); }
 .flow-svg .node rect { fill: #0f2422; stroke: #1c3a36; }
 .flow-svg .node text { fill: var(--teal); font-size: 12px; text-anchor: middle; font-family: var(--mono); font-weight: 700; }
@@ -260,8 +260,10 @@ code { font-family: var(--mono); background: #0c1320; padding: 1px 6px; border-r
 .reveal.in { opacity: 1; transform: none; }
 
 /* flowing arrows in the piece diagrams */
-/* static dashed arrows (no perpetual redraw — was a main-thread CPU cost) */
-.flow-svg .edge.flow { stroke-dasharray: 5 6; }
+/* flowing dashed arrows — dashes travel toward each arrowhead */
+@keyframes edgeflow { to { stroke-dashoffset: -24; } }
+.flow-svg .edge.flow { stroke-dasharray: 6 6; animation: edgeflow 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .flow-svg .edge.flow { animation: none; } }
 
 /* voice picker */
 .hp-voice { background: #0e141d; border: 1px solid var(--border); color: var(--muted); border-radius: 8px;
