@@ -515,9 +515,105 @@ function _statRow(host, cards) {
   });
 }
 
+// jump to another tab (opening its module if collapsed)
+function goTab(id) {
+  const tab = document.querySelector(`.tab[data-tab="${id}"]`);
+  if (!tab) return;
+  const sub = tab.closest(".submod");
+  if (sub && !sub.classList.contains("open")) {
+    const mod = document.querySelector(`.mod[data-mod="${sub.id.replace("mod-", "")}"]`);
+    if (mod) { mod.classList.add("open"); sub.classList.add("open"); }
+  }
+  tab.click();
+  window.scrollTo(0, 0);
+}
+
+// what each check means, why it matters, and the exact next step
+const QA_PLAYBOOK = {
+  "completeness": {
+    fail: { impact: "The field is defined but its source is almost empty — the model would have nothing real to answer with here.",
+            action: "Ingest a fuller source for this field, or retire the property if it isn't needed.", cta: "Go to Data Upload", tab: "ingest" },
+    warn: { impact: "Some records are blank for this field, so answers can be incomplete or skewed toward the rows that do have it.",
+            action: "Supplement with another source, or confirm the gaps are expected.", cta: "Go to Data Upload", tab: "ingest" },
+  },
+  "range / outlier": {
+    warn: { impact: "One or more values sit far from the rest — usually a unit slip or a data-entry error that would distort a total or comparison.",
+            action: "Inspect the flagged values against their source and fix the record or the transform.", cta: "Trace in Data fidelity", tab: "gov-fidelity" },
+  },
+  "low-confidence mapping": {
+    warn: { impact: "The mapping from raw column to this field was uncertain — it may be reading the wrong column.",
+            action: "Review the proposed mapping and approve it, or correct it.", cta: "Review in Controls", tab: "gov-controls" },
+  },
+};
+
+const QA_LEGEND = [
+  { key: "ok", badge: "badge-auto", title: "OK — healthy",
+    txt: "Populated, within range, and confidently mapped. The model can answer safely from this. No action needed." },
+  { key: "warn", badge: "badge-review", title: "Warning — review",
+    txt: "Partial data, an outlier, or a low-confidence mapping. A steward should confirm, supplement or correct it before it's fully trusted." },
+  { key: "fail", badge: "badge-tail", title: "Fail — blocking",
+    txt: "The field is defined but its source is almost empty — the model would be answering from thin air. Fix before relying on it." },
+];
+
 async function loadGovernance() {
-  // readiness
-  const rd = await api("/api/readiness");
+  const [rd, h] = await Promise.all([api("/api/readiness"), api("/api/health")]);
+  const needsAction = h.summary.fail + h.summary.warn;
+
+  // 1. posture stats
+  _statRow($("#gov-qa-stats"), [
+    ["sc-teal", "◎", "Model coverage", rd.overall_pct + "%"],
+    ["sc-green", "✓", "Values healthy", h.summary.ok],
+    ["sc-orange", "!", "Need a steward", needsAction],
+    ["sc-red", "⛔", "Blocking (fail)", h.summary.fail],
+  ]);
+
+  // 2. legend — what ok/warn/fail imply
+  const lg = $("#qa-legend"); lg.innerHTML = "";
+  QA_LEGEND.forEach(l => {
+    const n = h.summary[l.key];
+    const card = el("div", "qa-leg qa-leg-" + l.key);
+    card.innerHTML = `<div class="qa-leg-head"><span class="badge ${l.badge}">${l.key}</span>
+      <span class="qa-leg-title">${l.title}</span><span class="qa-leg-n">${n}</span></div>
+      <div class="qa-leg-txt">${l.txt}</div>`;
+    lg.appendChild(card);
+  });
+
+  // 3. action queue — grouped, with impact + recommended action + drill-through
+  const host = $("#qa-actions"); host.innerHTML = "";
+  const nonOk = h.checks.filter(c => c.severity !== "ok");
+  if (!nonOk.length) {
+    host.appendChild(el("div", "empty", "No open issues — every validated value is healthy and safe to answer from."));
+  } else {
+    const groups = {};
+    nonOk.forEach(c => (groups[c.check] = groups[c.check] || []).push(c));
+    const rank = g => (g.some(i => i.severity === "fail") ? 0 : 1);
+    Object.entries(groups).sort((a, b) => rank(a[1]) - rank(b[1]) || b[1].length - a[1].length).forEach(([check, items]) => {
+      const worst = items.some(i => i.severity === "fail") ? "fail" : "warn";
+      const pb = (QA_PLAYBOOK[check] && (QA_PLAYBOOK[check][worst] || QA_PLAYBOOK[check].warn)) || {};
+      const card = el("div", "qa-action");
+      card.innerHTML = `<div class="qa-action-head">
+          <span class="badge ${worst === "fail" ? "badge-tail" : "badge-review"}">${worst}</span>
+          <span class="qa-action-title">${esc(check)}</span>
+          <span class="qa-action-count">${items.length} field${items.length === 1 ? "" : "s"}</span></div>
+        <div class="qa-action-why"><b>Why it matters:</b> ${esc(pb.impact || "")}</div>
+        <div class="qa-action-do"><b>Recommended action:</b> ${esc(pb.action || "Review with a steward.")}</div>`;
+      const targets = el("div", "qa-targets");
+      items.slice(0, 60).forEach(it => {
+        const chip = el("button", "qa-target", `${esc(it.target)} · ${esc(it.value)}`);
+        chip.addEventListener("click", () => { const p = it.target.split("."); if (p.length >= 2) openPropertyDrawer(p[0], p.slice(1).join(".")); });
+        targets.appendChild(chip);
+      });
+      card.appendChild(targets);
+      if (pb.cta && pb.tab) {
+        const b = el("button", "btn btn-primary qa-cta", pb.cta + " →");
+        b.addEventListener("click", () => goTab(pb.tab));
+        card.appendChild(b);
+      }
+      host.appendChild(card);
+    });
+  }
+
+  // 4. readiness
   const rh = $("#readiness");
   rh.innerHTML = `<div style="margin-bottom:12px"><b>Overall coverage: ${rd.overall_pct}%</b>
     <span class="muted">— ${rd.bound}/${rd.total} canonical properties bound to data across ${rd.domains} business domains</span></div>`;
@@ -531,15 +627,14 @@ async function loadGovernance() {
     rh.appendChild(row);
   });
 
-  // health
-  const h = await api("/api/health");
+  // 5. full validation log
   $("#health-summary").innerHTML =
     `<div class="hs-pill hs-ok">${h.summary.ok} OK</div>
      <div class="hs-pill hs-warn">${h.summary.warn} warnings</div>
      <div class="hs-pill hs-fail">${h.summary.fail} failing</div>`;
   const hc = $("#health-checks"); hc.innerHTML = "";
   const card = el("div", "card");
-  card.appendChild(el("div", "card-head", `<span class="name">health checks</span><span class="meta">${h.checks.length} checks</span>`));
+  card.appendChild(el("div", "card-head", `<span class="name">validation log</span><span class="meta">${h.checks.length} checks</span>`));
   const wrap = el("div", "table-wrap"); const t = el("table");
   t.innerHTML = "<thead><tr><th>severity</th><th>target</th><th>check</th><th>finding</th></tr></thead>";
   const tb = el("tbody");
@@ -550,13 +645,6 @@ async function loadGovernance() {
     tb.appendChild(tr);
   });
   t.appendChild(tb); wrap.appendChild(t); card.appendChild(wrap); hc.appendChild(card);
-
-  _statRow($("#gov-qa-stats"), [
-    ["sc-teal", "◎", "Overall coverage", rd.overall_pct + "%"],
-    ["sc-green", "✓", "Checks passing", h.summary.ok],
-    ["sc-orange", "!", "Warnings", h.summary.warn],
-    ["sc-blue", "▦", "Bound properties", rd.bound + "/" + rd.total],
-  ]);
 }
 
 // ---- DATA GOVERNANCE · DATA FIDELITY ----

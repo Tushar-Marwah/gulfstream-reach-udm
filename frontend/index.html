@@ -476,17 +476,24 @@
 
   <!-- GOVERNANCE -->
   <section id="governance" class="panel">
-    <h2>Quality assurance — readiness &amp; health across the data lifecycle</h2>
-    <p class="muted">Don't just store the data — <b>assure</b> it. Coverage is scored against the canonical
-      specification, and automated checks validate every value continuously: completeness, conflicts,
-      out-of-range values and unmapped fields are surfaced, not hidden.</p>
+    <h2>Quality assurance — is the model safe to answer from?</h2>
+    <p class="muted">QA is the model's <b>trust layer</b>. Every value the model can be asked about is validated
+      continuously — completeness, anomalies, mapping confidence and unit conversions — so a gap or an error is
+      caught <b>here, by a steward, before it ever reaches an answer</b>. Each finding carries what it means and
+      the exact next step.</p>
 
     <div id="gov-qa-stats" class="stat-row"></div>
+
+    <h3>What the signals mean</h3>
+    <div id="qa-legend" class="qa-legend"></div>
+
+    <h3>Action queue <span class="muted">— issues to resolve, most urgent first; click a field to trace it</span></h3>
+    <div id="qa-actions"></div>
 
     <h3>Readiness by level <span class="muted">— how much of the model is bound to real data</span></h3>
     <div id="readiness" class="card" style="padding:14px 18px"></div>
 
-    <h3>Continuous health checks <span class="muted">— validation over the unified model</span></h3>
+    <h3>Full validation log <span class="muted">— every check, most severe first</span></h3>
     <div id="health-summary" class="health-summary"></div>
     <div id="health-checks"></div>
   </section>
