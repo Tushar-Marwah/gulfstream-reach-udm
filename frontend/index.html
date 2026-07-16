@@ -375,155 +375,90 @@
     <div class="faq reveal">
 
       <div class="faq-item">
-        <button class="faq-q">If I query for any data, how do you handle the runtime — won't fetching it live be slow?</button>
-        <div class="faq-a"><p>Two reasons it stays fast. <b>One:</b> every question only touches the few facts it
-          needs — like grabbing two books, not reading the whole library. <b>Two:</b> for questions people ask
-          often, we prepare the answer <b>in advance</b> and refresh it only when the underlying data changes — so
-          it comes back instantly. Only rare, brand-new questions do any live work, and even that is a small, indexed
-          lookup — not a scan of everything. In practice the slowest part is usually the AI <i>thinking</i>, not the
-          data fetch — and that's cached and tunable too.</p></div>
+        <button class="faq-q">How is data collected into the model?</button>
+        <div class="faq-a"><p>Collection is <b>governed ingestion</b>, not bulk loading. A source — a spreadsheet,
+          PDF, JSON export or free-form report — lands exactly as received; the platform profiles its structure and
+          proposes how each field maps into the ontology, which a data steward reviews and approves. The step is
+          <b>additive and reversible</b>: nothing is overwritten, and every record carries its provenance from the
+          moment it arrives, so the origin of any value is never in question.</p></div>
       </div>
 
       <div class="faq-item">
-        <button class="faq-q">Suppose we implement this at Gulfstream scale — how do we handle runtime?</button>
-        <div class="faq-a"><p>Exactly the same way, with three switches flipped. <b>One:</b> swap the small demo
-          database for a production one built for scale. <b>Two:</b> pre-compute and cache the common answers in the
-          background — on a schedule, or the moment data updates — so users get instant results. <b>Three:</b> run
-          heavy, one-off calculations on bigger compute behind the scenes, not while the user waits. The data model
-          itself <b>doesn't change</b> — only the engine underneath it gets bigger. So scaling is a known,
-          well-trodden path, not a redesign.</p></div>
+        <button class="faq-q">Where is the data stored, and how is it processed?</button>
+        <div class="faq-a"><p>The ontology stores <b>meaning, not data</b>. Source records remain in their systems of
+          record; the model holds only a thin metadata layer of objects, pointers and links. Processing is
+          <b>resolved at query time</b> — a semantic request is compiled into a validated, read-only query, executed
+          against the live source and returned. There is no second copy to reconcile and no batch to grow stale: the
+          model computes on the current state of record, every time.</p></div>
       </div>
 
       <div class="faq-item">
-        <button class="faq-q">Where does my data actually live? Are you copying it?</button>
-        <div class="faq-a"><p>Your files stay where they are — we never make a second copy. The model is just a
-          <b>map</b> that points at your data and explains what it means. If someone corrects a value, we store only
-          that one correction as an audited note on top; the original is never touched.</p></div>
+        <button class="faq-q">How do you identify and track where each fact comes from?</button>
+        <div class="faq-a"><p>Every property is bound to a specific origin — table, column, document — and that
+          binding is <b>first-class, visible metadata</b>. Any answer can be decomposed to the exact records that
+          produced it, with the transform applied along the way. Source identification is therefore not a forensic
+          exercise after the fact; it is a <b>structural property</b> of how the model is built, so complete lineage
+          is available on demand for every value.</p></div>
       </div>
 
       <div class="faq-item">
-        <button class="faq-q">What happens when we add a new kind of data, or a new client?</button>
-        <div class="faq-a"><p>Nothing breaks. A new file simply adds a few new pointers under the concepts that
-          already exist. The same platform serves a new client — or a whole new industry — by pointing at different
-          data. We don't rebuild the system each time.</p></div>
+        <button class="faq-q">How is the data governed across its lifecycle — ownership, controls, quality?</button>
+        <div class="faq-a"><p>Governance is woven into the fabric, not bolted on. Every object and property has
+          <b>defined ownership</b>; changes flow through <b>review and approval</b>; access is role-based, with
+          sensitive fields restricted by policy; and every action — ingest, mapping, correction, read — is
+          <b>logged and auditable</b>. Corrections are written as governed, attributed annotations <i>over</i> the
+          source rather than edits <i>to</i> it, so the full record of who changed what, when and why is preserved
+          end to end.</p></div>
       </div>
 
       <div class="faq-item">
-        <button class="faq-q">Can we trust the numbers, or is the AI making them up?</button>
-        <div class="faq-a"><p>The AI never invents numbers. It only decides <i>which</i> facts to fetch and how to
-          phrase the answer. The actual values come straight from your data through a fixed, auditable rule — and
-          every figure can be traced back to the exact file and cell it came from.</p></div>
+        <button class="faq-q">Are your collection templates and SOPs standardized and auditable?</button>
+        <div class="faq-a"><p>Yes. Collection is driven by <b>standardized templates</b> — defined column schemas the
+          platform validates on entry — and by documented SOPs for how each class of data is onboarded, mapped and
+          approved. Because both the templates and the process are <b>versioned and enforced by the system</b>, every
+          collection is repeatable and auditable: identical inputs follow an identical controlled path, and any
+          deviation is surfaced rather than absorbed silently.</p></div>
       </div>
 
       <div class="faq-item">
-        <button class="faq-q">How is this different from a normal database or spreadsheet?</button>
-        <div class="faq-a"><p>A spreadsheet holds values in fixed cells; ask a new kind of question and you rebuild
-          it. This holds <b>meaning and relationships</b>, so you can ask open-ended questions across many sources at
-          once — and it explains its answer with sources. It's the difference between a filing cabinet and a
-          knowledgeable assistant who knows where everything is.</p></div>
+        <button class="faq-q">What controls ensure data quality?</button>
+        <div class="faq-a"><p>Quality is enforced in layers. On entry, values are <b>validated and normalised</b>
+          against the ontology — units aligned, identifiers mapped, formats reconciled. <b>Continuous health checks</b>
+          run across the model for completeness, conflicts and anomalies, surfacing issues instead of hiding them.
+          When two sources disagree, both are retained and the <b>conflict is flagged</b> for resolution — never
+          silently overwritten. Quality is thus measured and monitored, not assumed.</p></div>
       </div>
 
       <div class="faq-item">
-        <button class="faq-q">What kinds of files can it take in?</button>
-        <div class="faq-a"><p>Almost anything — spreadsheets, CSVs, PDFs, JSON exports, even free-form written
-          reports. The AI reads the file, proposes how each part maps onto the model, and a person approves it. No
-          new file format needs custom code.</p></div>
+        <button class="faq-q">How is the data secured in the cloud?</button>
+        <div class="faq-a"><p>Security rests on <b>least-privilege access</b>, encryption in transit and at rest, and
+          strict isolation between teams, programmes or tenants on the same model. The agent operates under a
+          <b>read-only, allow-listed</b> boundary — it can never write to or delete from a system of record — and
+          every access is authenticated, authorised and logged. Sensitive fields are gated by policy, so <i>who can
+          see what</i> is a controlled, provable property of the deployment.</p></div>
       </div>
 
       <div class="faq-item">
-        <button class="faq-q">What if two files disagree, or repeat the same fact?</button>
-        <div class="faq-a"><p>Both are kept — we never overwrite a source. The model points at each one, and
-          governance <b>flags the conflict</b> for a person to resolve. You always know which file a number came
-          from, so disagreements are visible, not hidden.</p></div>
+        <button class="faq-q">How do you guarantee the answer is faithful to the underlying data?</button>
+        <div class="faq-a"><p>Fidelity holds because the source is <b>never mutated</b> and answers are
+          <b>computed, not inferred</b>. Exact values are read through deterministic, auditable rules; the model
+          decides <i>which</i> facts to retrieve and how to phrase them, but never invents a figure. Every number is
+          <b>traceable to its exact source record</b>, and where the data cannot answer, the system says so plainly
+          rather than approximating — you see the data faithfully, not a plausible reconstruction of it.</p></div>
       </div>
 
       <div class="faq-item">
-        <button class="faq-q">How do you handle different units — ppm vs mg/m³, °C vs °F?</button>
-        <div class="faq-a"><p>Every pointer carries a small conversion rule, so values are <b>normalised on the way
-          out</b> and everything becomes comparable. Where a currency or scale is ambiguous, it's flagged for a human
-          to confirm rather than guessed.</p></div>
-      </div>
-
-      <div class="faq-item">
-        <button class="faq-q">Who can see what? Is sensitive data protected?</button>
-        <div class="faq-a"><p>Yes. Access is role-based: sensitive fields like supplier pricing or formulations are <b>hidden from
-          viewers</b>, changes need approval, and every action is logged. Different teams or clients can be walled
-          off from each other while sharing the same model.</p></div>
-      </div>
-
-      <div class="faq-item">
-        <button class="faq-q">What happens if the answer isn't in the data?</button>
-        <div class="faq-a"><p>It says so, plainly, instead of inventing one. Answers are grounded in what was actually
-          retrieved and come <b>with their sources</b> — so "we don't have that" is a valid, honest answer.</p></div>
-      </div>
-
-      <div class="faq-item">
-        <button class="faq-q">How long does it take to onboard a new client or domain?</button>
-        <div class="faq-a"><p>Usually days, not a rebuild. You point the model at the new files, the AI proposes the
-          mapping, a person approves it, and it's queryable. The platform doesn't change — only the data it points
-          at does.</p></div>
+        <button class="faq-q">How adaptable is the model as our data and questions evolve?</button>
+        <div class="faq-a"><p>The model adapts by <b>extension, not rebuild</b>. Because meaning is decoupled from
+          storage, a new source, a new material class, or an entirely new domain is absorbed by adding pointers and
+          objects <b>under the concepts you already govern</b> — no schema migration, no re-engineering. New questions
+          need no new pipelines: the same resolution path answers them against whatever the ontology now describes.
+          Adaptivity is the model's default state, and onboarding a new domain is measured in <b>days, not
+          quarters</b>.</p></div>
       </div>
 
     </div>
 
-    <div class="sec-break"><span>Compared to the other approaches</span></div>
-
-    <h3 class="reveal">How it relates to the two proposals <span class="muted">— RAG vs routing tables</span></h3>
-    <div class="faq reveal">
-
-      <div class="faq-item">
-        <button class="faq-q">How is this different from plain RAG — just embedding everything as text?</button>
-        <div class="faq-a"><p>Pure RAG turns every document into text and finds answers by <i>similarity</i>. That's
-          great for narrative, but <b>weak at exact numbers</b>, can't really add things up, gets noisier as more
-          domains are mixed in, and it's hard to audit <i>why</i> an answer appeared. This model uses
-          <b>real, validated queries for the numbers</b> and keeps text-search only for the words — so you get
-          precise figures <i>and</i> the narrative, without the noise.</p></div>
-      </div>
-
-      <div class="faq-item">
-        <button class="faq-q">Isn't this just the "routing table + domain tables" approach from the proposal?</button>
-        <div class="faq-a"><p>Yes — it's that approach, generalised and made visual. The <b>ontology is the routing
-          registry</b>: each question is routed to the right objects, answered with validated read-only SQL on an
-          approved set of tables, with narrative search scoped alongside. It's the recommended Proposal 2, the same
-          pattern already live for ESG and PEL — just presented as one clean model.</p></div>
-      </div>
-
-      <div class="faq-item">
-        <button class="faq-q">Is the agent running arbitrary SQL? How is that safe?</button>
-        <div class="faq-a"><p>No. The agent never writes free-form SQL. The system generates <b>read-only (SELECT)
-          queries</b> against an approved <b>allow-list</b> of tables — no edits, no deletes — and every read is
-          validated and logged. The AI decides <i>what</i> to ask; it doesn't get raw access to the database.</p></div>
-      </div>
-
-      <div class="faq-item">
-        <button class="faq-q">How do you get exact numbers instead of similarity guesses?</button>
-        <div class="faq-a"><p>Numbers come from <b>querying the actual data</b>, not from matching the closest-looking
-          passage. Similarity search is used only to find relevant <i>words</i> — never to produce a figure. So a
-          benchmark or a total is computed from the real values, every time.</p></div>
-      </div>
-
-      <div class="faq-item">
-        <button class="faq-q">Why not just put everything in one big vector store?</button>
-        <div class="faq-a"><p>One big vector store blurs domains together and <b>degrades as you add more</b>, can't do
-          exact math, and makes "why this answer" hard to trace. Keeping facts in a queryable model and using search
-          only for text gives precision that <b>holds up as the domains grow</b>.</p></div>
-      </div>
-
-      <div class="faq-item">
-        <button class="faq-q">How do we add a new domain or industry?</button>
-        <div class="faq-a"><p>Mostly <b>data, not code</b>: register the new domain's objects and pointers and it's
-          live. The same safety guardrails (read-only + allow-list) and the existing test suite apply to it
-          automatically — so a new domain inherits the protections for free.</p></div>
-      </div>
-
-      <div class="faq-item">
-        <button class="faq-q">How is this different from Palantir Foundry?</button>
-        <div class="faq-a"><p>Same core idea — a governed map of meaning over messy data that an AI can reason on.
-          The difference is it's <b>ours</b>, built for our use cases, far faster and cheaper to stand up than a
-          full Foundry deployment, and ours to extend.</p></div>
-      </div>
-
-    </div>
   </section>
 
   <!-- RAW -->
