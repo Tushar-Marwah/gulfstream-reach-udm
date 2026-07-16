@@ -871,189 +871,164 @@ function renderAgent(r) {
   agFollowups($("#agent-result"), q => { $("#question").value = q; ask(); });
 }
 
-// ---- follow-up section (ported from the agentic UI: deep-dive chips + input) ----
-const AG_FOLLOWUPS = [
-  "Which programmes are most exposed to Annex XIV sunset dates?",
-  "What chrome-free alternatives are already qualified?",
-  "Which suppliers still need REACH registration follow-up?",
-  "Summarise the exposure limits for the substances still in use.",
-  "Which parts would a cadmium restriction impact first?",
-  "Where is hexavalent chromium still specified, and why?",
+// ---- AGENTIC AI: Palantir-style ontology agent (conversational + transparent trace) ----
+const AIP_STARTERS = [
+  { tag: "COMPLIANCE", icon: "⚠️", q: "Which materials on the G700 contain a REACH SVHC, and which parts are affected?" },
+  { tag: "SUBSTITUTION", icon: "🔄", q: "What chrome-free alternatives to strontium chromate are qualified, and where are they used?" },
+  { tag: "TRACEABILITY", icon: "🧭", q: "Trace where strontium chromate is used — from chemical to material to part to programme." },
+  { tag: "DEADLINES", icon: "⏳", q: "Which chemicals are on the REACH Authorisation List (Annex XIV), and what are their sunset dates?" },
+  { tag: "SUPPLY CHAIN", icon: "🏭", q: "Which suppliers are not confirmed REACH-registered, and what materials do they supply?" },
+  { tag: "SAFETY", icon: "🧪", q: "What are the exposure limits and hazard statements for the substances still in use?" },
 ];
-let _fupIdx = 0;
-function agFollowups(host, ask) {
-  const pool = AG_FOLLOWUPS.concat(AG_FOLLOWUPS).slice(_fupIdx % AG_FOLLOWUPS.length, (_fupIdx % AG_FOLLOWUPS.length) + 3);
-  _fupIdx += 3;
-  const sec = el("div", "ag-followup");
-  sec.appendChild(el("span", "ag-section-title", "Suggested deep dives"));
-  const chips = el("div", "ag-followup-chips");
-  pool.forEach(q => {
-    const c = el("button", "ag-followup-chip", "✦ " + esc(q));
-    c.addEventListener("click", () => ask(q));
-    chips.appendChild(c);
-  });
-  sec.appendChild(chips);
-  const wrap = el("div", "ag-followup-input-wrap");
-  const inp = el("input", "ag-followup-input"); inp.placeholder = "Ask a follow-up…";
-  const btn = el("button", "ag-send-btn", "➤");
-  const go = () => { const v = inp.value.trim(); if (v) ask(v); };
-  btn.addEventListener("click", go);
-  inp.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
-  wrap.appendChild(inp); wrap.appendChild(btn);
-  sec.appendChild(wrap);
-  host.appendChild(sec);
-}
+const AIP_PHASES = ["Interpreting the request", "Planning ontology queries",
+  "Resolving objects from source", "Retrieving documentation", "Composing a cited answer"];
 
-async function askGuided(q) {
-  const answer = $("#ag-answer"); if (!answer) return;
-  answer.innerHTML = '<div class="spinner">Thinking…</div>';
-  const r = await api("/api/agent", { question: q, use_llm: true });
-  renderAgentInto(answer, r);
-  agFollowups(answer, askGuided);
-}
-
-function renderAgentInto(host, r) {
-  host.innerHTML = "";
-  const modeBadge = r.mode === "llm" ? '<span class="badge badge-new">Claude</span>'
-    : '<span class="badge badge-soft">router</span>';
-  host.appendChild(el("div", "interp",
-    `${modeBadge} <b>Interpretation:</b> ${esc(r.interpretation)}`));
-  if (r.llm_error) host.appendChild(el("div", "interp",
-    `<span class="badge badge-review">Claude unavailable</span> fell back to the router. <span class="muted">${esc(r.llm_error)}</span>`));
-
-  r.steps.forEach(s => {
-    const step = el("div", "step");
-    step.appendChild(el("div", "step-head",
-      `<span>${esc(s.label)}</span><span class="obj">${esc(s.object)}</span>`));
-    if (s.narrative) {
-      step.appendChild(el("div", "sql", esc(s.sql)));
-      const body = el("div"); body.style.padding = "12px 14px";
-      (s.rows || []).forEach(p => body.appendChild(el("div", "passage",
-        `<div class="p-head"><span class="badge badge-soft">${esc(p.kind)}</span>
-          <span class="p-ent">${esc(p.entity)}</span></div>
-         <div class="p-text">${esc(p.text)}</div>`)));
-      step.appendChild(body);
-    } else {
-      step.appendChild(el("div", "sql", highlightSql(s.sql)));
-      if (s.rows && s.rows.length) step.appendChild(dataTable(s.columns, s.rows));
-      else step.appendChild(el("div", "empty", "No rows."));
-    }
-    host.appendChild(step);
-  });
-
-  const ans = el("div", "answer");
-  const conf = r.mode === "llm" ? "High confidence" : "Heuristic";
-  ans.innerHTML = `<div class="lbl">Agent answer <span class="ag-conf"><span class="dot"></span>${conf}</span></div>${esc(r.answer)}`;
-  if (r.sources && r.sources.length)
-    ans.appendChild(el("div", "sources", `<b>Grounded in:</b> ${r.sources.map(esc).join(", ")}`));
-  if (r.cost_usd)
-    ans.appendChild(el("div", "sources", `<b>LLM cost:</b> $${Number(r.cost_usd).toFixed(5)} (${esc(r.engine || "")})`));
-  host.appendChild(ans);
-}
-
-// ---- AGENTIC AI: guided scenarios + free chat --------------------------
-const AG_SCENARIOS = [
-  { id: "svhc", icon: "⚠️", tag: "COMPLIANCE",
-    label: "Find REACH SVHCs across a programme",
-    q: "Which materials contain a REACH SVHC, and which programmes and parts are affected?",
-    steps: ["Scan Chemical objects for SVHC / Annex XIV flags", "Join Material → Chemical on CAS",
-      "Trace Part → Programme through the link graph", "Compile a cited answer"] },
-  { id: "subst", icon: "🔄", tag: "SUBSTITUTION",
-    label: "Map substitution options for a substance",
-    q: "What are the chrome-free and cadmium-free alternatives to the substances in use, and what is their qualification status?",
-    steps: ["Identify hazardous substances in scope", "Retrieve substitution notes from the narrative store",
-      "Cross-check qualification status per material", "Summarise viable drop-in alternatives"] },
-  { id: "trace", icon: "🧭", tag: "TRACEABILITY",
-    label: "Trace where a chemical is used",
-    q: "Trace where strontium chromate is used — from chemical to material to part to programme.",
-    steps: ["Resolve the Chemical by CAS", "Follow Material containsChemical", "Follow Part madeOf → usedOn Programme",
-      "Assemble the end-to-end usage path"] },
-  { id: "annex", icon: "⏳", tag: "DEADLINES",
-    label: "Authorisation-list sunset exposure",
-    q: "Which chemicals are on the REACH Authorisation List (Annex XIV), and what are their sunset dates?",
-    steps: ["Filter Chemical objects by Annex XIV status", "Read restriction reference and deadline",
-      "Rank by nearest sunset date", "Return a dated exposure list"] },
-  { id: "supplier", icon: "🏭", tag: "SUPPLY CHAIN",
-    label: "Assess supplier REACH registration",
-    q: "Which suppliers are not confirmed REACH-registered, and what materials do they supply?",
-    steps: ["Read Supplier approval / registration status", "Join Supplier → Material",
-      "Flag unconfirmed registrations", "Report exposure by supplier"] },
-  { id: "exposure", icon: "🧪", tag: "SAFETY",
-    label: "Exposure limits & hazard profile",
-    q: "What are the exposure limits and hazard statements for the substances still in use?",
-    steps: ["Collect Chemical hazard + exposure properties", "Normalise exposure limits to ppm",
-      "Attach GHS hazard statements", "Compile a safety summary"] },
-];
-
-let agWired = false;
+let aipWired = false, aipBusy = false;
 function loadAgentic() {
-  const grid = $("#ag-grid");
-  if (grid && !grid._built) {
-    grid._built = true;
-    AG_SCENARIOS.forEach(s => {
-      const card = el("div", "ag-card");
-      card.innerHTML = `<div class="ag-card-ic">${s.icon}</div>
-        <div class="ag-card-label">${esc(s.label)}</div>
-        <div class="ag-card-tag">${esc(s.tag)}</div>`;
-      card.addEventListener("click", () => runScenario(s));
-      grid.appendChild(card);
+  const thread = $("#aip-thread");
+  if (thread && !thread._built) { thread._built = true; aipEmptyState(); }
+  if (!aipWired) {
+    aipWired = true;
+    const input = $("#aip-input");
+    const send = () => { const v = input.value.trim(); if (v) aipSend(v); };
+    $("#aip-send").addEventListener("click", send);
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+    input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 140) + "px"; });
+    api("/api/meta").then(m => {
+      const host = $("#aip-suggest"); if (!host) return;
+      (m.suggested_questions || []).slice(0, 4).forEach(q => {
+        const c = el("button", "aip-chip", esc(q));
+        c.addEventListener("click", () => aipSend(q));
+        host.appendChild(c);
+      });
+      if (m.llm && m.llm.agent_model) $("#aip-model").textContent = m.llm.agent_model.replace(/_/g, " ");
     });
   }
-  if (!agWired) {
-    agWired = true;
-    $$(".ag-mode").forEach(b => b.addEventListener("click", () => {
-      $$(".ag-mode").forEach(x => x.classList.remove("on"));
-      b.classList.add("on");
-      const m = b.dataset.mode;
-      $("#ag-guided").classList.toggle("hidden", m !== "guided");
-      $("#ag-chat").classList.toggle("hidden", m !== "chat");
-    }));
-    if ($("#ag-back")) $("#ag-back").addEventListener("click", agBack);
-  }
-  loadAgentMeta();   // populate free-chat suggestions + Claude toggle
 }
 
-function agBack() {
-  $("#ag-scenarios").classList.remove("hidden");
-  $("#ag-back").classList.add("hidden");
-  const run = $("#ag-run"); run.classList.add("hidden"); run.innerHTML = "";
+function aipEmptyState() {
+  const thread = $("#aip-thread");
+  const wrap = el("div", "aip-empty");
+  wrap.innerHTML = `
+    <div class="aip-empty-mark">✦</div>
+    <div class="aip-empty-title">Ask the ontology anything</div>
+    <div class="aip-empty-sub">Chemicals, materials, parts, suppliers and compliance — one agent that plans,
+      resolves from the systems of record, and cites its work. Start from a capability or type a question below.</div>`;
+  const grid = el("div", "aip-starters");
+  AIP_STARTERS.forEach(s => {
+    const c = el("button", "aip-starter");
+    c.innerHTML = `<span class="aip-starter-ic">${s.icon}</span>
+      <span class="aip-starter-tag">${esc(s.tag)}</span>
+      <span class="aip-starter-q">${esc(s.q)}</span>`;
+    c.addEventListener("click", () => aipSend(s.q));
+    grid.appendChild(c);
+  });
+  wrap.appendChild(grid);
+  thread.appendChild(wrap);
 }
 
-async function runScenario(s) {
-  $("#ag-scenarios").classList.add("hidden");
-  $("#ag-back").classList.remove("hidden");
-  const run = $("#ag-run"); run.classList.remove("hidden");
-  run.innerHTML = `
-    <div class="ag-run-head">
-      <span class="ag-card-ic">${s.icon}</span>
-      <div><div class="ag-run-title">${esc(s.label)}</div><div class="ag-card-tag">${esc(s.tag)}</div></div>
-    </div>
-    <div class="ag-reason">
-      <div class="ag-reason-title">Reasoning path</div>
-      <div class="ag-steps" id="ag-steps"></div>
-    </div>
-    <div id="ag-answer"></div>`;
-  const host = $("#ag-steps");
-  s.steps.forEach((st, i) => host.appendChild(
-    el("div", "ag-step", `<span class="ag-step-node">${i + 1}</span><span class="ag-step-text">${esc(st)}</span>`)));
-  $("#ag-answer").innerHTML = '<div class="ag-synth"><span class="ag-synth-spin"></span>Resolving the ontology and composing a cited answer…</div>';
-  const stepEls = $$(".ag-step", host);
-  let i = 0, timer;
-  const advance = () => {
-    // complete each step, but keep the LAST one 'active' (thinking) until the answer lands
-    if (i > 0 && i < stepEls.length) { const p = stepEls[i - 1]; p.classList.remove("active"); p.classList.add("done"); p.querySelector(".ag-step-node").textContent = "✓"; }
-    if (i < stepEls.length) { stepEls[i].classList.add("active"); i++; }
-    if (i >= stepEls.length) clearInterval(timer);
+function aipScroll(node) { if (node && node.scrollIntoView) node.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+
+async function aipSend(q) {
+  if (aipBusy) return;
+  aipBusy = true;
+  const thread = $("#aip-thread");
+  const empty = thread.querySelector(".aip-empty"); if (empty) empty.remove();
+  const input = $("#aip-input"); input.value = ""; input.style.height = "auto";
+
+  const uturn = el("div", "aip-turn user");
+  uturn.innerHTML = `<div class="aip-msg">${esc(q)}</div>`;
+  thread.appendChild(uturn);
+
+  const aturn = el("div", "aip-turn agent");
+  aturn.innerHTML = `<div class="aip-avatar">✦</div><div class="aip-body"></div>`;
+  const body = aturn.querySelector(".aip-body");
+  thread.appendChild(aturn);
+  aipScroll(uturn);
+
+  const workEl = el("div", "aip-working");
+  body.appendChild(workEl);
+  let p = 0;
+  const renderWork = () => {
+    workEl.innerHTML = AIP_PHASES.map((ph, i) => {
+      const st = i < p ? "done" : i === p ? "active" : "idle";
+      const ic = st === "done" ? "✓" : st === "active" ? '<span class="aip-mini-spin"></span>' : "";
+      return `<div class="aip-work-item ${st}"><span class="aip-work-ic">${ic}</span><span>${ph}</span></div>`;
+    }).join("");
   };
-  advance();
-  timer = setInterval(advance, 1100);
+  renderWork();
+  const timer = setInterval(() => { if (p < AIP_PHASES.length - 1) { p++; renderWork(); } else clearInterval(timer); }, 1300);
+
   let r;
-  try { r = await api("/api/agent", { question: s.q, use_llm: true }); }
-  finally { clearInterval(timer); }
-  stepEls.forEach(e => { e.classList.remove("active"); e.classList.add("done"); e.querySelector(".ag-step-node").textContent = "✓"; });
-  const answer = $("#ag-answer");
-  renderAgentInto(answer, r);
-  agFollowups(answer, askGuided);
+  try { r = await api("/api/agent", { question: q, use_llm: true }); }
+  catch (e) { r = null; }
+  clearInterval(timer);
+  workEl.remove();
+
+  if (!r) { body.appendChild(el("div", "aip-err", "The agent could not complete that request. Please try again.")); aipBusy = false; return; }
+  aipRenderResult(body, r);
+  aipBusy = false;
+  aipScroll(aturn);
+}
+
+function aipRenderResult(body, r) {
+  // 1. Plan
+  const plan = el("div", "aip-plan");
+  plan.innerHTML = `<span class="aip-plan-badge">PLAN</span> ${esc(r.interpretation || "Planned ontology queries.")}`;
+  body.appendChild(plan);
+
+  // 2. Activity trace — each step, expandable to its exact query + rows
+  const trace = el("div", "aip-trace");
+  const objs = new Set();
+  (r.steps || []).forEach(s => {
+    if (!s.narrative) objs.add(s.object);
+    const item = el("div", "aip-act");
+    const n = (s.rows || []).length;
+    const label = s.narrative
+      ? `Retrieved <b>${n}</b> narrative passage${n === 1 ? "" : "s"}`
+      : `Queried <b>${esc(s.object)}</b> <span class="aip-act-n">${n} row${n === 1 ? "" : "s"}</span>`;
+    item.innerHTML = `<span class="aip-act-dot"></span>
+      <div class="aip-act-main">
+        <div class="aip-act-head"><span class="aip-act-label">${label}</span>
+          <span class="aip-act-toggle">view</span></div>
+        <div class="aip-act-detail hidden"></div>
+      </div>`;
+    const detail = item.querySelector(".aip-act-detail");
+    if (s.narrative) {
+      (s.rows || []).forEach(pas => detail.appendChild(el("div", "passage",
+        `<div class="p-head"><span class="badge badge-soft">${esc(pas.kind)}</span>
+          <span class="p-ent">${esc(pas.entity)}</span></div><div class="p-text">${esc(pas.text)}</div>`)));
+    } else {
+      detail.appendChild(el("div", "sql", highlightSql(s.sql)));
+      if (s.rows && s.rows.length) detail.appendChild(dataTable(s.columns, s.rows, 40));
+      else detail.appendChild(el("div", "empty", "No rows."));
+    }
+    const tog = item.querySelector(".aip-act-toggle");
+    item.querySelector(".aip-act-head").addEventListener("click", () => {
+      const hid = detail.classList.toggle("hidden");
+      tog.textContent = hid ? "view" : "hide";
+    });
+    trace.appendChild(item);
+  });
+  if ((r.steps || []).length) body.appendChild(trace);
+
+  // 3. Answer — cited, object-grounded
+  const ans = el("div", "aip-answer");
+  const conf = r.mode === "llm" ? "High confidence" : "Heuristic";
+  ans.innerHTML = `<div class="aip-answer-head"><span class="aip-answer-lbl">Answer</span>
+    <span class="ag-conf"><span class="dot"></span>${conf}</span></div>
+    <div class="aip-answer-text">${esc(r.answer)}</div>`;
+  if (objs.size) {
+    const chips = el("div", "aip-obj-chips");
+    chips.innerHTML = `<span class="aip-grounded">Grounded in</span>` +
+      [...objs].map(o => `<span class="aip-obj-chip">${esc(o)}</span>`).join("");
+    ans.appendChild(chips);
+  }
+  if (r.sources && r.sources.length)
+    ans.appendChild(el("div", "aip-sources", `<b>Sources:</b> ${r.sources.map(esc).join(" · ")}`));
+  body.appendChild(ans);
 }
 
 // ---- DATA SOURCE IDENTIFICATION -----------------------------------------
@@ -1226,8 +1201,8 @@ async function loadTplDashboard() {
   }
 }
 
-$("#ask-btn").addEventListener("click", ask);
-$("#question").addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
+if ($("#ask-btn")) $("#ask-btn").addEventListener("click", ask);
+if ($("#question")) $("#question").addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
 if ($("#narr-btn")) $("#narr-btn").addEventListener("click", () => loadNarrative($("#narr-q").value.trim()));
 if ($("#narr-q")) $("#narr-q").addEventListener("keydown", e => { if (e.key === "Enter") loadNarrative($("#narr-q").value.trim()); });
 if ($("#ent-btn")) $("#ent-btn").addEventListener("click", () => entitySearch($("#ent-q").value.trim()));

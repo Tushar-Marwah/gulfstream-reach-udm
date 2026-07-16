@@ -563,42 +563,23 @@
 
   <!-- AGENT -->
   <section id="agent" class="panel">
-    <div class="ag-head">
+    <div class="aip-top">
       <div>
         <h2>Agentic AI</h2>
-        <p class="muted">Reasoning agents over the REACH / materials ontology — never raw tables. Work in
-          <b>guided</b> mode from ready-made scenarios, or ask anything in <b>free chat</b>. Every answer is planned,
-          resolved and cited.</p>
+        <p class="muted">A reasoning agent over the materials &amp; chemical-compliance ontology. It plans a query,
+          resolves it from the systems of record, weaves in documentation, and answers with citations you can open —
+          it never touches a raw table directly, only governed objects.</p>
       </div>
-      <div class="ag-status"><span class="ag-dot"></span> Context synchronized · Materials &amp; Chemical Compliance</div>
+      <div class="aip-status"><span class="ag-dot"></span> Ontology-grounded <span class="aip-status-sep">·</span> <span id="aip-model">Opus</span></div>
     </div>
-
-    <div class="ag-modes">
-      <button class="ag-mode on" data-mode="guided">◆ Guided</button>
-      <button class="ag-mode" data-mode="chat">💬 Free chat</button>
-    </div>
-
-    <!-- GUIDED MODE -->
-    <div id="ag-guided">
-      <div id="ag-back" class="ag-back hidden"><span>←</span> Back to scenarios</div>
-      <div id="ag-scenarios">
-        <span class="ag-section-title">Analysis scenarios</span>
-        <div class="ag-grid" id="ag-grid"></div>
+    <div id="aip-thread" class="aip-thread"></div>
+    <div class="aip-composer">
+      <div id="aip-suggest" class="aip-suggest"></div>
+      <div class="aip-input-row">
+        <textarea id="aip-input" rows="1" placeholder="Ask across chemicals, materials, parts, suppliers, compliance…"></textarea>
+        <button id="aip-send" class="aip-send" title="Send">➤</button>
       </div>
-      <div id="ag-run" class="hidden"></div>
-    </div>
-
-    <!-- FREE CHAT MODE -->
-    <div id="ag-chat" class="hidden">
-      <div id="suggested" class="chips question-chips"></div>
-      <div class="ask-row">
-        <input id="question" type="text" placeholder="Ask about REACH SVHCs, materials, suppliers, or a program…" autocomplete="off">
-        <label id="llm-toggle-wrap" class="llm-toggle hidden">
-          <input type="checkbox" id="use-llm"> use Claude
-        </label>
-        <button id="ask-btn" class="btn btn-primary">Ask</button>
-      </div>
-      <div id="agent-result"></div>
+      <div class="aip-hint">Every answer is planned, resolved from source, and cited — expand any step to see the exact query and rows.</div>
     </div>
   </section>
 
