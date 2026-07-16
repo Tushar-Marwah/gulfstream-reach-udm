@@ -1224,15 +1224,15 @@ function initOverviewDemo() {
 
   // captions for the silent, self-paced walkthrough (no voice-over)
   const NAR = [
-    { scene: 1, cap: "Here's the whole flow at a glance — a <b>question</b> at the top, the <b>things we track</b> in the middle, your <b>raw files</b> at the bottom. Now let's watch it happen." },
-    { scene: 2, cap: "It all starts with one <b>question</b>, in plain English." },
-    { scene: 3, cap: "The question <b>breaks apart</b> and links to the <b>objects</b> that can answer it. <span class='def'>An object is a business thing — a Brand, a Product, a Price.</span>" },
-    { scene: 4, cap: "Each object reaches <b>down through a pointer</b> to where that fact really lives. <span class='def'>A pointer is like a phone contact — the name points to the number.</span>" },
-    { scene: 5, cap: "The pointers <b>fetch the real values</b>, live, with a query written in <b>SQL</b>. <span class='def'>SQL is the standard language for asking a database for data.</span>" },
-    { scene: 6, cap: "Values come back <b>cleaned</b> — rupee signs stripped, crore turned into millions — so everything lines up." },
-    { scene: 7, cap: "The <b>words</b> join too — strategy and notes from the narrative store, found by keyword search." },
-    { scene: 8, cap: "Everything <b>converges</b> — the numbers and the narrative fuse into one connected picture." },
-    { scene: 9, cap: "Out comes a single <b>cited</b> answer. <b>Nothing was pre-stored</b> — the same path runs for any question, any company." },
+    { scene: 1, cap: "One view of the whole model: a <b>business question</b> at the top, the <b>objects you govern</b> in the middle — Part, Material, Chemical, Compliance — and your <b>source records</b> at the bottom. Watch a single question flow through all three, fully traceable." },
+    { scene: 2, cap: "It begins with a question in <b>plain business language</b> — no query syntax, no data-science skills required. Here: <b>“Which G700 materials contain a REACH SVHC?”</b>" },
+    { scene: 3, cap: "The platform decomposes that question into the <b>business objects</b> that can answer it. <span class='def'>Objects are the real-world things you manage — a material, a chemical, a regulation — not raw database tables.</span>" },
+    { scene: 4, cap: "Each object resolves <b>through a governed pointer</b> to where the fact actually lives in your systems. The object stores no data itself — only a controlled reference, so there is a single source of truth." },
+    { scene: 5, cap: "Those pointers <b>retrieve the live values on demand</b>, generating the underlying query automatically. Nothing is copied or duplicated — the model always reads from the system of record." },
+    { scene: 6, cap: "Values return <b>normalised and reconciled</b> — units aligned, CAS numbers mapped, formats standardised — so data from different suppliers and systems becomes directly comparable." },
+    { scene: 7, cap: "Unstructured evidence joins too: <b>safety data sheets and substitution notes</b> are retrieved alongside the structured facts, so no relevant context is left behind." },
+    { scene: 8, cap: "Structured data and documentation <b>converge into one connected view</b> — the links between part, material, chemical and regulation are resolved in a single pass." },
+    { scene: 9, cap: "The result is one <b>fully-cited answer</b>, traceable to its exact source. <b>Nothing was pre-computed</b> — the identical path runs for any question, any programme, any regulation." },
   ];
   // rough reading time per caption
   function holdMs(html) {
